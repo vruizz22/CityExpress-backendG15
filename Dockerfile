@@ -6,7 +6,7 @@ RUN corepack enable pnpm
 WORKDIR /usr/src/app
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install
+RUN pnpm install --frozen-lockfile
 
 COPY prisma ./prisma
 RUN pnpx prisma generate
@@ -18,10 +18,14 @@ FROM node:20-alpine
 WORKDIR /usr/src/app
 
 RUN corepack enable pnpm
-COPY --from=builder /usr/src/app/node_modules ./node_modules
-COPY --from=builder /usr/src/app/package.json ./package.json
+COPY package.json pnpm-lock.yaml ./
+
+RUN pnpm install --prod --frozen-lockfile
+
 COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/prisma ./prisma
+
+RUN pnpx prisma generate
 
 EXPOSE 3000
 
