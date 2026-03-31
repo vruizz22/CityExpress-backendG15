@@ -96,3 +96,9 @@ pnpx prisma migrate dev --name init
 ```
 
 Donde init es el nombre de la migración, el cual se puede cambiar a algo más descriptivo si se desea. Sobretodo para futuras migraciones.
+
+### ENV
+
+Las variables de entorno se configuran en el archivo `.env` en la raíz del proyecto, el cual es cargado automáticamente por Docker-Compose y Prisma. Asegúrate de configurar correctamente las credenciales de la base de datos y del broker RabbitMQ para que el sistema funcione correctamente.
+
+El env de ejemplo se encuentra ubicado en la ruta [`./.example.env`](./.example.env) y se debe renombrar a `.env` para su uso.
