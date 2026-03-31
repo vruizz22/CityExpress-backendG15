@@ -80,3 +80,19 @@ Table package_event {
 ### Nombre del dominio
 
 El servidor web expuesto y funcionando está en la URL: **[https://e0-quackpackage-vruizz22.tech/packages](https://e0-quackpackage-vruizz22.tech/packages)**
+
+## Ejecución local
+
+La ejecución local se realiza mediante Docker-Compose, el cual levanta los servicios de base de datos, master y connector en una red interna aislada. Para iniciar el entorno, simplemente ejecutar:
+
+```bash
+docker-compose up -d
+```
+
+Con prisma realizaremos las migraciones y luego podremos consumir los endpoints de la API en `http://localhost:3000/packages` para listar los paquetes registrados. El servicio connector se encargará de consumir los eventos del broker y enviar los datos a master automáticamente.
+
+```bash
+pnpx prisma migrate dev --name init
+```
+
+Donde init es el nombre de la migración, el cual se puede cambiar a algo más descriptivo si se desea. Sobretodo para futuras migraciones.
