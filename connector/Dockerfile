@@ -1,6 +1,12 @@
 FROM node:20-alpine
+
+RUN corepack enable pnpm
+
 WORKDIR /usr/src/app
-COPY package*.json ./
-RUN npm install
+
+COPY package.json ./
+RUN pnpm install
+
 COPY index.js ./
-CMD ["npm", "start"]
+
+CMD ["pnpm", "start"]
