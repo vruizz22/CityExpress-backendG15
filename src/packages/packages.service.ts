@@ -3,36 +3,69 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '@/prisma.service';
+
+export interface PackageBody {
+  id: string;
+  deliveryStrategy: string;
+  maxHops: number;
+  createdAt: string;
+  deliverNotBefore?: string | null;
+  originId: string;
+  destinationId: string;
+  metaContent?: string | null;
+  isMetaEncrypted: boolean;
+  constraints?: Record<string, unknown> | null;
+  priorityClass: string;
+  payment: number;
+}
+
+export interface CreatePackageDto {
+  idpk: string;
+  type: string;
+  packageBody: PackageBody;
+}
+
+export interface GetPackagesQuery {
+  page?: string;
+  limit?: string;
+  originId?: string;
+  destinationId?: string;
+  payment?: string;
+  deliveryStrategy?: string;
+  createdAt?: string;
+}
 
 @Injectable()
 export class PackagesService {
   constructor(private prisma: PrismaService) {}
 
-  async createPackage(data: any) {
+  async createPackage(data: CreatePackageDto) {
     if (!data.packageBody) {
       throw new BadRequestException('Formato de paquete inválido');
     }
 
     try {
+      const body = data.packageBody;
       const result = await this.prisma.packageEvent.create({
         data: {
           idpk: data.idpk,
           type: data.type,
-          packageId: data.packageBody.id,
-          deliveryStrategy: data.packageBody.deliveryStrategy,
-          maxHops: data.packageBody.maxHops,
-          createdAt: new Date(data.packageBody.createdAt),
-          deliverNotBefore: data.packageBody.deliverNotBefore
-            ? new Date(data.packageBody.deliverNotBefore)
+          packageId: body.id,
+          deliveryStrategy: body.deliveryStrategy,
+          maxHops: body.maxHops,
+          createdAt: new Date(body.createdAt),
+          deliverNotBefore: body.deliverNotBefore
+            ? new Date(body.deliverNotBefore)
             : null,
-          originId: data.packageBody.originId,
-          destinationId: data.packageBody.destinationId,
-          metaContent: data.packageBody.metaContent,
-          isMetaEncrypted: data.packageBody.isMetaEncrypted,
-          constraints: data.packageBody.constraints || {},
-          priorityClass: data.packageBody.priorityClass,
-          payment: data.packageBody.payment,
+          originId: body.originId,
+          destinationId: body.destinationId,
+          metaContent: body.metaContent,
+          isMetaEncrypted: body.isMetaEncrypted,
+          constraints: (body.constraints ?? {}) as Prisma.InputJsonValue,
+          priorityClass: body.priorityClass,
+          payment: Number(body.payment),
         },
       });
       return result;
@@ -44,19 +77,17 @@ export class PackagesService {
     }
   }
 
-  async getPackages(query: any) {
-    const page = parseInt(query.page) || 1;
-    const limit = parseInt(query.limit) || 25;
+  async getPackages(query: GetPackagesQuery) {
+    const page = parseInt(query.page || '1', 10) || 1;
+    const limit = parseInt(query.limit || '25', 10) || 25;
     const skip = (page - 1) * limit;
 
-    // Filtros
-    const where: any = {};
+    const where: Record<string, unknown> = {};
     if (query.originId) where.originId = query.originId;
     if (query.destinationId) where.destinationId = query.destinationId;
     if (query.payment) where.payment = parseFloat(query.payment);
     if (query.deliveryStrategy) where.deliveryStrategy = query.deliveryStrategy;
 
-    // Si envían fecha createdAt en el query (ej: 2026-03-01)
     if (query.createdAt) {
       where.createdAt = {
         gte: new Date(`${query.createdAt}T00:00:00.000Z`),
