@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: quackpackage_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - quack-net
+
+  master:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quackpackage_master
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+    depends_on:
+      - db
+    networks:
+      - quack-net
+
+  connector:
+    build:
+      context: ./connector
+      dockerfile: Dockerfile
+    container_name: quackpackage_connector
+    restart: always
+    environment:
+      - RABBITMQ_URL=${RABBITMQ_URL}
+      - RABBITMQ_QUEUE=${RABBITMQ_QUEUE}
+      - MASTER_API_URL=${MASTER_API_URL}
+    depends_on:
+      - master
+    networks:
+      - quack-net
+
+volumes:
+  pgdata:
+
+networks:
+  quack-net:
+    driver: bridge

@@ -1,98 +1,104 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Entrega 0: QuackPackage
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+- **Framework Web (Master):** Nest.js (TypeScript), elegido por su arquitectura modular limpia que permite un crecimiento ordenado y escalable.
+- **Microservicio Conector (Connector):** Node.js puro usando `amqplib` y `axios` para consumo ligero y envío rápido de eventos a Master.
+- **Base de datos:** PostgreSQL.
+- **ORM:** Prisma v7 con adapter de PostgreSQL, aprovechando su sólido soporte de migración y validación transaccional por TypeScript.
+- **Entorno en la nube:** AWS EC2 (Servidor Ubuntu LTS) con NGINX como **Reverse Proxy**.
+- **Infraestructura orquestada:** Todo el stack de base de datos, servicio connector y master corren aislados y comunicados internamente en Docker-Compose por la network `quack-net`.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 🧩 Resolución de las Entregas y Puntajes
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+A continuación, marco el estatus de todos los requisitos de acuerdo a la implementación realizada:
 
-## Project setup
+### Requisitos Funcionales (Parte mínima) (10p)
 
-```bash
-$ pnpm install
+- ✅ **RF1 (3p) Esencial:** La API ofrece la lista de los paquetes reportados con todos los campos recuperados del body y aplanados en el schema ORM.
+- ✅ **RF2 (1p) Esencial:** Se ofrece endpoint `GET /packages/:id` para mostrar el detalle de cada paquete específico por ID.
+- ✅ **RF3 (2p) Esencial:** Endpoint de lista está paginado por defecto de a 25 registros empleando los `queryParams` de `page` y `limit` (mediante las operaciones *skip* y *take* de Prisma).
+- ✅ **RF4 (4p) Esencial:** El endpoint de lista permite filtrar por todas sus variantes (`payment`, `originId`, `deliveryStrategy` y los registros según fecha desde `createdAt`).
+
+### Requisitos No Funcionales (20p)
+
+- ✅ **RNF1 (5p) Esencial:** Módulo `connector` funcionando 100% independiente para conectarse al `observer.XX.q` en RabbitMQ y consumiendo los JSONs (`type: package-received`) para enviarlos mediante solicitudes POST a la API web.
+- ✅ **RNF2 (4p) Esencial:** Servicio web en `master` recibe en su ruta POST los datos para registrarlos en la DB.
+- ✅ **RNF3 (3p):** Uso de proxy inverso **NGINX** instalado puramente sobre la máquina EC2 y redirigiendo hacia el puerto **3000** del contenedor web.
+- ✅ **RNF4 (2p):** Servidor con el dominio `e0-quackpackage-vruizz22.tech`.
+- ✅ **RNF5 (2p) Esencial:** Servidor corriendo y hosteado en AWS EC2 (Free Tier `t3.micro`).
+- ✅ **RNF6 (4p):** Contenedor de la base de datos de persistencia en PostgreSQL administrada mediante el orquestador sin costo de RDS externo.
+
+### Docker-Compose (15p)
+
+- ✅ **RNF1 (5p):** App `master` se lanza empaquetada en una imagen `node:20-alpine` pre-poblada con las migraciones Prisma en su init.
+- ✅ **RNF2 (5p):** DB `db` empaquetada usando `postgres:15-alpine` y volúmenes internos de Docker (storage en `pgdata`).
+- ✅ **RNF3 (5p):** Servicio de cola `connector` orquestado esperando a que primero compile `master`, comunicándose con este localmente sin exponer puertos expuestos hacia el host (sólo mediante internal network `quack-net`).
+
+### Parte Variable
+
+He optado por **HTTPS (25% - 15p)**:
+
+- ✅ **RNF1:** El tráfico está asegurado correctamente con SSL utilizando Let's Encrypt (Certbot).
+- ✅ **RNF2:** Todas las peticiones HTTP convencionales en el puerto 80 son redirigidas a HTTPS en el puerto 443 a nivel NGINX.
+- ✅ **RNF3:** El chequeo automático de expiración de Certbot se enlista y ejecuta periódicamente 2 veces al día empleando nativamente los cronjobs/timers de Ubuntu.
+
+---
+
+## 📚 Arquitectura de Base de Datos y DBML
+
+El diseño de la base aplanó los registros anidados recibidos del broker para maximizar y facilitar su filtrado:
+
+```sql
+Project quackpackage {
+  database_type: 'PostgreSQL'
+  Note: 'Modelo de datos para los paquetes recibidos (QuackPackage)'
+}
+
+Table package_event {
+  idpk             varchar     [pk, not null, note: 'UUIDv4 - Primary Key']
+  type             varchar     [not null]
+  packageId        varchar     [not null]
+  deliveryStrategy varchar     [not null]
+  maxHops          int         [not null]
+  createdAt        timestamptz [not null]
+  deliverNotBefore timestamptz
+  originId         varchar     [not null]
+  destinationId    varchar     [not null]
+  metaContent      varchar
+  isMetaEncrypted  boolean     [not null]
+  constraints      json
+  priorityClass    varchar     [not null]
+  payment          float       [not null]
+}
 ```
 
-## Compile and run the project
+---
+
+## 📁 Archivos y Configuración Relevante
+
+### Nombre del dominio
+
+El servidor web expuesto y funcionando está en la URL: **[https://e0-quackpackage-vruizz22.tech/packages](https://e0-quackpackage-vruizz22.tech/packages)**
+
+## Ejecución local
+
+La ejecución local se realiza mediante Docker-Compose, el cual levanta los servicios de base de datos, master y connector en una red interna aislada. Para iniciar el entorno, simplemente ejecutar:
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+docker-compose up -d
 ```
 
-## Run tests
+Con prisma realizaremos las migraciones y luego podremos consumir los endpoints de la API en `http://localhost:3000/packages` para listar los paquetes registrados. El servicio connector se encargará de consumir los eventos del broker y enviar los datos a master automáticamente.
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+pnpx prisma migrate dev --name init
 ```
 
-## Deployment
+Donde init es el nombre de la migración, el cual se puede cambiar a algo más descriptivo si se desea. Sobretodo para futuras migraciones.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### ENV
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Las variables de entorno se configuran en el archivo `.env` en la raíz del proyecto, el cual es cargado automáticamente por Docker-Compose y Prisma. Asegúrate de configurar correctamente las credenciales de la base de datos y del broker RabbitMQ para que el sistema funcione correctamente.
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+El env de ejemplo se encuentra ubicado en la ruta [`./.example.env`](./.example.env) y se debe renombrar a `.env` para su uso.
