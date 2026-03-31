@@ -12,7 +12,7 @@ async function start() {
     const channel = await connection.createChannel();
 
     // Asertar la cola por seguridad
-    await channel.assertQueue(RABBITMQ_QUEUE, { durable: true });
+    // await channel.assertQueue(RABBITMQ_QUEUE, { durable: true });
     console.log(`[*] Esperando eventos en la cola ${RABBITMQ_QUEUE}...`);
 
     channel.consume(RABBITMQ_QUEUE, async (msg) => {
@@ -22,9 +22,18 @@ async function start() {
           const data = JSON.parse(content);
 
           if (data.type === 'package-received') {
-            console.log(`[x] Evento ${data.type} detectado. IDPK: ${data.idpk}`);
+            const id = data.idpk || 'N/A';
+            console.log(`[x] Evento ${data.type} detectado. IDPK: ${id}`);
+
+            // Adaptamos el payload de RabbitMQ (body) al DTO de NestJS (packageBody)
+            const payload = { ...data };
+            if (payload.body && !payload.packageBody) {
+              payload.packageBody = payload.body;
+              delete payload.body;
+            }
+
             // Enviar POST a la API MASTER
-            await axios.post(`${MASTER_API_URL}/packages`, data);
+            await axios.post(`${MASTER_API_URL}/packages`, payload);
             console.log(`[V] POST exitoso a ${MASTER_API_URL}/packages`);
           } else {
             console.log(`[!] Tipo de mensaje ignorado: ${data.type}`);
