@@ -1,9 +1,6 @@
 import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
-import {
-  PackagesService,
-  CreatePackageDto,
-  GetPackagesQuery,
-} from '@packages/packages.service';
+import { PackagesService } from '@packages/packages.service';
+import { CreatePackageDto, GetPackagesQuery } from '@dto/package.dto';
 
 @Controller('packages')
 export class PackagesController {
