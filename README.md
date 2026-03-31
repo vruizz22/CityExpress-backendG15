@@ -79,7 +79,7 @@ Table package_event {
 
 ### Nombre del dominio
 
-El servidor web expuesto y funcionando está en la URL: **[https://e0-quackpackage-vruizz22.tech/packages](https://e0-quackpackage-vruizz22.tech/packages)**
+El servidor web expuesto y funcionando está en la URL: **[https://e0-quackpackage-vruizz22.tech/packages](https://e0-quackpackage-vruizz22.tech/packages)**, la ip de la instancia EC2 es `3.239.99.168` y el dominio está registrado en Namecheap apuntando a esta IP.
 
 ## Ejecución local
 
