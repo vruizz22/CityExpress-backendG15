@@ -1,10 +1,7 @@
-import { defineConfig } from '@prisma/config';
-import * as process from 'process';
+import { defineConfig, env } from '@prisma/config';
 
 export default defineConfig({
-  earlyAccess: true,
-  migrate: {
-    schemaPath: 'prisma/schema.prisma',
-    url: process.env.DATABASE_URL,
+  datasource: {
+    url: env('DATABASE_URL'),
   },
 });
