@@ -87,8 +87,9 @@ export class PackagesService {
   }
 
   async getPackageById(id: string) {
-    const pkg = await this.prisma.packageEvent.findUnique({
-      where: { idpk: id },
+    const pkg = await this.prisma.packageEvent.findFirst({
+      where: { packageId: id },
+      orderBy: { createdAt: 'desc' },
     });
     if (!pkg) {
       throw new NotFoundException('Paquete no encontrado');
