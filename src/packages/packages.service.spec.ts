@@ -1,10 +1,8 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment,
-                  @typescript-eslint/no-unsafe-member-access */
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
-import { PackagesService } from './packages.service';
-import { PrismaService } from '../prisma.service';
-import { CreatePackageDto } from '../dto/package.dto';
+import { PackagesService } from '@packages/packages.service';
+import { PrismaService } from '@/prisma.service';
+import { CreatePackageDto } from '@dto/package.dto';
 
 type PrismaMock = {
   packageEvent: {
@@ -176,8 +174,9 @@ describe('PackagesService', () => {
       await service.createPackage(baseDto);
 
       expect(prisma.packageEvent.create).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({
-          idpk: baseDto.idpk,
+          idpk: String(baseDto.idpk),
           type: 'package-transit',
           packageId: 'pkg-test-1',
           deliveryStrategy: 'direct',
@@ -196,7 +195,8 @@ describe('PackagesService', () => {
 
       await service.createPackage(baseDto);
 
-      const call = prisma.packageEvent.create.mock.calls[0][0] as {
+      const calls = prisma.packageEvent.create.mock.calls as unknown[][];
+      const call = calls[0][0] as {
         data: { createdAt: Date; deliverNotBefore: Date | null };
       };
       expect(call.data.createdAt).toBeInstanceOf(Date);
@@ -210,12 +210,16 @@ describe('PackagesService', () => {
       prisma.packageEvent.create.mockResolvedValue({ idpk: baseDto.idpk });
       const dto: CreatePackageDto = {
         ...baseDto,
-        packageBody: { ...baseDto.packageBody, deliverNotBefore: null },
+        packageBody: {
+          ...baseDto.packageBody,
+          deliverNotBefore: undefined,
+        } as unknown as CreatePackageDto['packageBody'],
       };
 
       await service.createPackage(dto);
 
-      const call = prisma.packageEvent.create.mock.calls[0][0] as {
+      const calls = prisma.packageEvent.create.mock.calls as unknown[][];
+      const call = calls[0][0] as {
         data: { deliverNotBefore: Date | null };
       };
       expect(call.data.deliverNotBefore).toBeNull();
