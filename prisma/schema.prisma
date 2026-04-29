@@ -1,0 +1,25 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model PackageEvent {
+  idpk             String    @id @default(uuid())
+  type             String
+  packageId        String
+  deliveryStrategy String
+  maxHops          Int
+  createdAt        DateTime
+  deliverNotBefore DateTime?
+  originId         String
+  destinationId    String
+  metaContent      String?
+  isMetaEncrypted  Boolean
+  constraints      Json?
+  priorityClass    String
+  payment          Float
+}
