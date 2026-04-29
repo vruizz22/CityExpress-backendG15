@@ -1,59 +1,101 @@
-# compiled output
-/dist
-/node_modules
-/build
 
-# Logs
-logs
-*.log
+# Dependencies
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.npm
+.pnpm-store
+.yarn-integrity
+.yarn/*
+/node_modules
+bower_components
+jspm_packages/
+node_modules/
 npm-debug.log*
 pnpm-debug.log*
+web_modules/
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
 
-# OS
-.DS_Store
-
-# Tests
-/coverage
-/.nyc_output
-
-# IDEs and editors
-/.idea
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
-
-# IDE - VSCode
-/.vscode
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-
-# dotenv environment variable files
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
-
-# temp directory
+# Build Output
+**/.vitepress/cache
+**/.vitepress/dist
+*.pem
+*.tgz
+*.tsbuildinfo
+.cache
+.cache/
+.docusaurus
+.dynamodb/
+.eslintcache
+.firebase/
+.fusebox/
+.grunt
+.lock-wscript
+.next
+.node_repl_history
+.nuxt
+.output
+.parcel-cache
+.pnp.*
+.serverless/
+.stylelintcache
+.svelte-kit/
 .temp
 .tmp
+.vite/
+.vuepress/dist
+/build
+/dist
+/generated/prisma
+build/Release
+dist
+lib-cov
+out
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
 
-# Runtime data
-pids
+# Logs & Runtime
+*.log
 *.pid
-*.seed
 *.pid.lock
-
-# Diagnostic reports (https://nodejs.org/api/report.html)
+*.seed
+lerna-debug.log*
+logs
+pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-/generated/prisma
-*.pem
+# Testing
+*.lcov
+.nyc_output
+/.nyc_output
+/coverage
+coverage
+
+# IDE & OS
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
+*.launch
+*.sublime-workspace
+.DS_Store
+.c9/
+.classpath
+.project
+.settings/
+.tern-port
+.vscode-test
+/.idea
+/.vscode
+
+# Environment
+!.env.example
+.env
+.env.*
+.env.development.local
+.env.local
+.env.production.local
+.env.test.local
