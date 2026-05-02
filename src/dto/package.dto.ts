@@ -28,3 +28,19 @@ export interface GetPackagesQuery {
   deliveryStrategy?: string;
   createdAt?: string;
 }
+
+export interface PackageView {
+  id: string;
+  originId: string;
+  destinationId: string;
+  maxHops: number;
+  createdAt: Date;
+  deliverNotBefore: Date | null;
+  lastAction: string | null;
+  receivedAt: Date;
+  canDeliver: boolean;
+}
+
+export interface DeliverPackageBody {
+  idpk?: string;
+}

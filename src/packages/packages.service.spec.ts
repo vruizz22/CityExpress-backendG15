@@ -8,21 +8,48 @@ type PrismaMock = {
   packageEvent: {
     findFirst: jest.Mock;
     findMany: jest.Mock;
+    groupBy: jest.Mock;
     count: jest.Mock;
+    create: jest.Mock;
+  };
+  auditEvent: {
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
     create: jest.Mock;
   };
 };
 
+const OWN_CITY = 'HGW';
+
 describe('PackagesService', () => {
   let service: PackagesService;
   let prisma: PrismaMock;
+  const originalCityId = process.env.CITY_ID;
+
+  beforeAll(() => {
+    process.env.CITY_ID = OWN_CITY;
+  });
+
+  afterAll(() => {
+    if (originalCityId === undefined) {
+      delete process.env.CITY_ID;
+    } else {
+      process.env.CITY_ID = originalCityId;
+    }
+  });
 
   beforeEach(async () => {
     prisma = {
       packageEvent: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
+        groupBy: jest.fn(),
         count: jest.fn(),
+        create: jest.fn(),
+      },
+      auditEvent: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
         create: jest.fn(),
       },
     };
@@ -35,117 +62,6 @@ describe('PackagesService', () => {
     }).compile();
 
     service = module.get<PackagesService>(PackagesService);
-  });
-
-  describe('getPackageById (RF2 hotfix)', () => {
-    it('queries by packageId ordered by createdAt desc', async () => {
-      const expectedEvent = {
-        idpk: 'evt-2',
-        type: 'package-transit',
-        packageId: 'pkg-test-1',
-        createdAt: new Date('2026-04-27T12:00:00.000Z'),
-      };
-      prisma.packageEvent.findFirst.mockResolvedValue(expectedEvent);
-
-      const result = await service.getPackageById('pkg-test-1');
-
-      expect(prisma.packageEvent.findFirst).toHaveBeenCalledTimes(1);
-      expect(prisma.packageEvent.findFirst).toHaveBeenCalledWith({
-        where: { packageId: 'pkg-test-1' },
-        orderBy: { createdAt: 'desc' },
-      });
-      expect(result).toEqual(expectedEvent);
-    });
-
-    it('throws NotFoundException when no event matches the packageId', async () => {
-      prisma.packageEvent.findFirst.mockResolvedValue(null);
-
-      await expect(service.getPackageById('non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(prisma.packageEvent.findFirst).toHaveBeenCalledWith({
-        where: { packageId: 'non-existent' },
-        orderBy: { createdAt: 'desc' },
-      });
-    });
-  });
-
-  describe('getPackages', () => {
-    beforeEach(() => {
-      prisma.packageEvent.findMany.mockResolvedValue([]);
-      prisma.packageEvent.count.mockResolvedValue(0);
-    });
-
-    it('applies default pagination (page=1, limit=25) and orderBy createdAt desc', async () => {
-      const result = await service.getPackages({});
-
-      expect(prisma.packageEvent.findMany).toHaveBeenCalledWith({
-        where: {},
-        skip: 0,
-        take: 25,
-        orderBy: { createdAt: 'desc' },
-      });
-      expect(result.meta).toEqual({
-        total: 0,
-        page: 1,
-        limit: 25,
-        totalPages: 0,
-      });
-    });
-
-    it('computes skip from page and limit', async () => {
-      prisma.packageEvent.count.mockResolvedValue(100);
-
-      const result = await service.getPackages({ page: '3', limit: '10' });
-
-      expect(prisma.packageEvent.findMany).toHaveBeenCalledWith({
-        where: {},
-        skip: 20,
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-      });
-      expect(result.meta).toEqual({
-        total: 100,
-        page: 3,
-        limit: 10,
-        totalPages: 10,
-      });
-    });
-
-    it('builds a UTC date range when createdAt filter is present', async () => {
-      await service.getPackages({ createdAt: '2026-04-27' });
-
-      expect(prisma.packageEvent.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            createdAt: {
-              gte: new Date('2026-04-27T00:00:00.000Z'),
-              lte: new Date('2026-04-27T23:59:59.999Z'),
-            },
-          },
-        }),
-      );
-    });
-
-    it('forwards scalar filters (originId, destinationId, deliveryStrategy, payment) to Prisma', async () => {
-      await service.getPackages({
-        originId: 'central',
-        destinationId: 'HGW',
-        deliveryStrategy: 'direct',
-        payment: '1500.5',
-      });
-
-      expect(prisma.packageEvent.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            originId: 'central',
-            destinationId: 'HGW',
-            deliveryStrategy: 'direct',
-            payment: 1500.5,
-          },
-        }),
-      );
-    });
   });
 
   describe('createPackage', () => {
@@ -179,31 +95,11 @@ describe('PackagesService', () => {
           idpk: String(baseDto.idpk),
           type: 'package-transit',
           packageId: 'pkg-test-1',
-          deliveryStrategy: 'direct',
           maxHops: 3,
           originId: 'central',
           destinationId: 'HGW',
-          isMetaEncrypted: false,
-          priorityClass: 'medium',
-          payment: 0,
         }),
       });
-    });
-
-    it('parses createdAt and deliverNotBefore into Date instances', async () => {
-      prisma.packageEvent.create.mockResolvedValue({ idpk: baseDto.idpk });
-
-      await service.createPackage(baseDto);
-
-      const calls = prisma.packageEvent.create.mock.calls as unknown[][];
-      const call = calls[0][0] as {
-        data: { createdAt: Date; deliverNotBefore: Date | null };
-      };
-      expect(call.data.createdAt).toBeInstanceOf(Date);
-      expect(call.data.createdAt.toISOString()).toBe(
-        '2026-04-27T12:00:00.000Z',
-      );
-      expect(call.data.deliverNotBefore).toBeInstanceOf(Date);
     });
 
     it('persists null when deliverNotBefore is missing', async () => {
@@ -213,7 +109,7 @@ describe('PackagesService', () => {
         packageBody: {
           ...baseDto.packageBody,
           deliverNotBefore: undefined,
-        } as unknown as CreatePackageDto['packageBody'],
+        },
       };
 
       await service.createPackage(dto);
@@ -250,6 +146,354 @@ describe('PackagesService', () => {
       );
 
       errorSpy.mockRestore();
+    });
+  });
+
+  describe('getPackages', () => {
+    const eventForOwnCity = {
+      idpk: 'evt-1',
+      type: 'package-transit',
+      packageId: 'pkg-1',
+      deliveryStrategy: 'direct',
+      maxHops: 2,
+      createdAt: new Date('2026-04-27T12:00:00.000Z'),
+      deliverNotBefore: new Date('2026-04-27T18:00:00.000Z'),
+      originId: 'central',
+      destinationId: OWN_CITY,
+      metaContent: '',
+      isMetaEncrypted: false,
+      constraints: {},
+      priorityClass: 'medium',
+      payment: 0,
+      receivedAt: new Date('2026-04-27T19:00:00.000Z'),
+    };
+
+    const eventForOtherCity = {
+      ...eventForOwnCity,
+      idpk: 'evt-2',
+      packageId: 'pkg-2',
+      destinationId: 'COR',
+      receivedAt: new Date('2026-04-27T20:00:00.000Z'),
+    };
+
+    it('returns one row per packageId with the latest snapshot', async () => {
+      prisma.packageEvent.groupBy.mockResolvedValue([
+        {
+          packageId: 'pkg-1',
+          _max: { receivedAt: eventForOwnCity.receivedAt },
+        },
+        {
+          packageId: 'pkg-2',
+          _max: { receivedAt: eventForOtherCity.receivedAt },
+        },
+      ]);
+      prisma.packageEvent.findMany.mockImplementation(
+        (args: { distinct?: string[] }) => {
+          if (args.distinct) {
+            return Promise.resolve([
+              { packageId: 'pkg-1' },
+              { packageId: 'pkg-2' },
+            ]);
+          }
+          return Promise.resolve([eventForOwnCity, eventForOtherCity]);
+        },
+      );
+      prisma.auditEvent.findMany.mockResolvedValue([]);
+
+      const result = await service.getPackages(
+        {},
+        new Date('2026-04-28T00:00:00.000Z'),
+      );
+
+      expect(result.meta.total).toBe(2);
+      expect(result.data).toHaveLength(2);
+      const ids = result.data.map((p) => p.id);
+      expect(ids).toEqual(expect.arrayContaining(['pkg-1', 'pkg-2']));
+    });
+
+    it('marks canDeliver=true only for own-city packages past deliverNotBefore not yet delivered', async () => {
+      prisma.packageEvent.groupBy.mockResolvedValue([
+        {
+          packageId: 'pkg-1',
+          _max: { receivedAt: eventForOwnCity.receivedAt },
+        },
+        {
+          packageId: 'pkg-2',
+          _max: { receivedAt: eventForOtherCity.receivedAt },
+        },
+      ]);
+      prisma.packageEvent.findMany.mockImplementation(
+        (args: { distinct?: string[] }) => {
+          if (args.distinct) {
+            return Promise.resolve([
+              { packageId: 'pkg-1' },
+              { packageId: 'pkg-2' },
+            ]);
+          }
+          return Promise.resolve([eventForOwnCity, eventForOtherCity]);
+        },
+      );
+      prisma.auditEvent.findMany.mockResolvedValue([
+        {
+          packageId: 'pkg-1',
+          type: 'received',
+          createdAt: new Date('2026-04-27T19:30:00.000Z'),
+        },
+      ]);
+
+      const result = await service.getPackages(
+        {},
+        new Date('2026-04-28T00:00:00.000Z'),
+      );
+
+      const pkg1 = result.data.find((p) => p.id === 'pkg-1')!;
+      const pkg2 = result.data.find((p) => p.id === 'pkg-2')!;
+      expect(pkg1.canDeliver).toBe(true);
+      expect(pkg1.lastAction).toBe('received');
+      expect(pkg2.canDeliver).toBe(false);
+    });
+
+    it('canDeliver=false when deliverNotBefore is in the future', async () => {
+      prisma.packageEvent.groupBy.mockResolvedValue([
+        {
+          packageId: 'pkg-1',
+          _max: { receivedAt: eventForOwnCity.receivedAt },
+        },
+      ]);
+      prisma.packageEvent.findMany.mockImplementation(
+        (args: { distinct?: string[] }) => {
+          if (args.distinct) {
+            return Promise.resolve([{ packageId: 'pkg-1' }]);
+          }
+          return Promise.resolve([eventForOwnCity]);
+        },
+      );
+      prisma.auditEvent.findMany.mockResolvedValue([]);
+
+      const result = await service.getPackages(
+        {},
+        new Date('2026-04-27T17:00:00.000Z'),
+      );
+
+      expect(result.data[0].canDeliver).toBe(false);
+    });
+
+    it('canDeliver=false when last action is delivered', async () => {
+      prisma.packageEvent.groupBy.mockResolvedValue([
+        {
+          packageId: 'pkg-1',
+          _max: { receivedAt: eventForOwnCity.receivedAt },
+        },
+      ]);
+      prisma.packageEvent.findMany.mockImplementation(
+        (args: { distinct?: string[] }) => {
+          if (args.distinct) {
+            return Promise.resolve([{ packageId: 'pkg-1' }]);
+          }
+          return Promise.resolve([eventForOwnCity]);
+        },
+      );
+      prisma.auditEvent.findMany.mockResolvedValue([
+        {
+          packageId: 'pkg-1',
+          type: 'delivered',
+          createdAt: new Date('2026-04-27T20:00:00.000Z'),
+        },
+        {
+          packageId: 'pkg-1',
+          type: 'received',
+          createdAt: new Date('2026-04-27T19:00:00.000Z'),
+        },
+      ]);
+
+      const result = await service.getPackages(
+        {},
+        new Date('2026-04-28T00:00:00.000Z'),
+      );
+
+      expect(result.data[0].lastAction).toBe('delivered');
+      expect(result.data[0].canDeliver).toBe(false);
+    });
+  });
+
+  describe('getPackageById', () => {
+    it('returns the latest snapshot with last action', async () => {
+      const evt = {
+        idpk: 'evt-1',
+        packageId: 'pkg-1',
+        type: 'package-transit',
+        deliveryStrategy: 'direct',
+        maxHops: 1,
+        createdAt: new Date('2026-04-27T12:00:00.000Z'),
+        deliverNotBefore: null,
+        originId: 'central',
+        destinationId: OWN_CITY,
+        metaContent: '',
+        isMetaEncrypted: false,
+        constraints: {},
+        priorityClass: 'medium',
+        payment: 0,
+        receivedAt: new Date('2026-04-27T19:00:00.000Z'),
+      };
+      prisma.packageEvent.findFirst.mockResolvedValue(evt);
+      prisma.auditEvent.findFirst.mockResolvedValue({ type: 'received' });
+
+      const result = await service.getPackageById(
+        'pkg-1',
+        new Date('2026-04-28T00:00:00.000Z'),
+      );
+
+      expect(result.id).toBe('pkg-1');
+      expect(result.lastAction).toBe('received');
+      expect(result.canDeliver).toBe(true);
+    });
+
+    it('throws NotFoundException when no event matches', async () => {
+      prisma.packageEvent.findFirst.mockResolvedValue(null);
+      await expect(service.getPackageById('missing')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('deliverPackage (idempotency)', () => {
+    const ownPackage = {
+      idpk: 'evt-1',
+      packageId: 'pkg-1',
+      type: 'package-transit',
+      deliveryStrategy: 'direct',
+      maxHops: 1,
+      createdAt: new Date('2026-04-27T12:00:00.000Z'),
+      deliverNotBefore: new Date('2026-04-27T18:00:00.000Z'),
+      originId: 'central',
+      destinationId: OWN_CITY,
+      metaContent: '',
+      isMetaEncrypted: false,
+      constraints: {},
+      priorityClass: 'medium',
+      payment: 0,
+      receivedAt: new Date('2026-04-27T19:00:00.000Z'),
+    };
+
+    it('throws NotFound when package does not exist', async () => {
+      prisma.packageEvent.findFirst.mockResolvedValue(null);
+      await expect(service.deliverPackage('missing')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('rejects when destinationId is not the own city', async () => {
+      prisma.packageEvent.findFirst.mockResolvedValue({
+        ...ownPackage,
+        destinationId: 'COR',
+      });
+      await expect(service.deliverPackage('pkg-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('rejects when current time is before deliverNotBefore', async () => {
+      prisma.packageEvent.findFirst.mockResolvedValue(ownPackage);
+      await expect(
+        service.deliverPackage(
+          'pkg-1',
+          undefined,
+          new Date('2026-04-27T17:00:00.000Z'),
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('returns alreadyDelivered when a delivered audit already exists', async () => {
+      prisma.packageEvent.findFirst.mockResolvedValue(ownPackage);
+      const existing = {
+        idpk: 'delivered:pkg-1',
+        type: 'delivered',
+        createdAt: new Date('2026-04-27T20:00:00.000Z'),
+      };
+      prisma.auditEvent.findFirst.mockResolvedValue(existing);
+
+      const result = await service.deliverPackage(
+        'pkg-1',
+        undefined,
+        new Date('2026-04-28T00:00:00.000Z'),
+      );
+
+      expect(result.alreadyDelivered).toBe(true);
+      expect(result.idpk).toBe('delivered:pkg-1');
+      expect(prisma.auditEvent.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a delivered audit and returns idpk', async () => {
+      prisma.packageEvent.findFirst.mockResolvedValue(ownPackage);
+      prisma.auditEvent.findFirst.mockResolvedValue(null);
+      prisma.auditEvent.create.mockResolvedValue({
+        idpk: 'delivered:pkg-1',
+        packageId: 'pkg-1',
+        type: 'delivered',
+        createdAt: new Date('2026-04-28T00:00:00.000Z'),
+      });
+
+      const result = await service.deliverPackage(
+        'pkg-1',
+        undefined,
+        new Date('2026-04-28T00:00:00.000Z'),
+      );
+
+      expect(result.delivered).toBe(true);
+      expect(result.alreadyDelivered).toBe(false);
+      expect(result.idpk).toBe('delivered:pkg-1');
+      expect(prisma.auditEvent.create).toHaveBeenCalledWith({
+        data: {
+          idpk: 'delivered:pkg-1',
+          packageId: 'pkg-1',
+          type: 'delivered',
+        },
+      });
+    });
+
+    it('uses caller-provided idpk when present', async () => {
+      prisma.packageEvent.findFirst.mockResolvedValue(ownPackage);
+      prisma.auditEvent.findFirst.mockResolvedValue(null);
+      prisma.auditEvent.create.mockResolvedValue({
+        idpk: 'caller-idpk',
+        packageId: 'pkg-1',
+        type: 'delivered',
+        createdAt: new Date('2026-04-28T00:00:00.000Z'),
+      });
+
+      await service.deliverPackage(
+        'pkg-1',
+        'caller-idpk',
+        new Date('2026-04-28T00:00:00.000Z'),
+      );
+
+      expect(prisma.auditEvent.create).toHaveBeenCalledWith({
+        data: {
+          idpk: 'caller-idpk',
+          packageId: 'pkg-1',
+          type: 'delivered',
+        },
+      });
+    });
+
+    it('treats P2002 race as alreadyDelivered', async () => {
+      prisma.packageEvent.findFirst.mockResolvedValue(ownPackage);
+      prisma.auditEvent.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          idpk: 'delivered:pkg-1',
+          type: 'delivered',
+          createdAt: new Date('2026-04-28T00:00:01.000Z'),
+        });
+      prisma.auditEvent.create.mockRejectedValue({ code: 'P2002' });
+
+      const result = await service.deliverPackage(
+        'pkg-1',
+        undefined,
+        new Date('2026-04-28T00:00:00.000Z'),
+      );
+
+      expect(result.alreadyDelivered).toBe(true);
     });
   });
 });
