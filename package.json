@@ -78,6 +78,9 @@
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
       "^@packages/(.*)$": "<rootDir>/packages/$1",
+      "^@routes/(.*)$": "<rootDir>/routes/$1",
+      "^@audit/(.*)$": "<rootDir>/audit/$1",
+      "^@config/(.*)$": "<rootDir>/config/$1",
       "^@dto/(.*)$": "<rootDir>/dto/$1"
     }
   }
