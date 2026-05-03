@@ -7,8 +7,10 @@ datasource db {
   provider = "postgresql"
 }
 
+// Cada mensaje recibido sobre un paquete genera un evento. Idempotencia
+// garantizada por la PK `idpk` (idempotency key del mensaje).
 model PackageEvent {
-  idpk             String    @id @default(uuid())
+  idpk             String    @id
   type             String
   packageId        String
   deliveryStrategy String
@@ -23,4 +25,41 @@ model PackageEvent {
   priorityClass    String
   payment          Float
   senderCityId     String?
+  receivedAt       DateTime  @default(now())
+
+  @@index([packageId, receivedAt])
+  @@index([destinationId])
+}
+
+// Estado de la tabla de distancias para nuestra ciudad. Un row por ciudad
+// destino conocida; `enabled` se actualiza desde los mensajes "distance-table".
+model Route {
+  code          String   @id
+  name          String
+  enabled       Boolean  @default(false)
+  distance      BigInt?
+  transportCost BigInt?
+  updatedAt     DateTime @updatedAt
+}
+
+// Registro de auditorías reportadas a la central. La PK es la idempotency
+// key del mensaje de auditoría enviado.
+model AuditEvent {
+  idpk      String   @id
+  packageId String
+  type      String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([packageId, createdAt])
+  @@index([type])
+}
+
+// Modelo mínimo de usuarios para los endpoints autenticados (RNF06 lo
+// completa con el proveedor externo).
+model User {
+  id        String   @id @default(uuid())
+  subject   String   @unique
+  email     String?
+  createdAt DateTime @default(now())
 }
