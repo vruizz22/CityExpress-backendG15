@@ -1,6 +1,19 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  Headers,
+  HttpCode,
+} from '@nestjs/common';
 import { PackagesService } from '@packages/packages.service';
-import { CreatePackageDto, GetPackagesQuery } from '@dto/package.dto';
+import {
+  CreatePackageDto,
+  DeliverPackageBody,
+  GetPackagesQuery,
+} from '@dto/package.dto';
 
 @Controller('packages')
 export class PackagesController {
@@ -19,5 +32,16 @@ export class PackagesController {
   @Get(':id')
   getPackageById(@Param('id') id: string) {
     return this.packagesService.getPackageById(id);
+  }
+
+  @Post(':id/deliver')
+  @HttpCode(200)
+  deliverPackage(
+    @Param('id') id: string,
+    @Body() body: DeliverPackageBody = {},
+    @Headers('idempotency-key') idempotencyHeader?: string,
+  ) {
+    const idpk = body?.idpk ?? idempotencyHeader;
+    return this.packagesService.deliverPackage(id, idpk);
   }
 }

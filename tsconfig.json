@@ -13,6 +13,9 @@
     "paths": {
       "@/*": ["src/*"],
       "@packages/*": ["src/packages/*"],
+      "@routes/*": ["src/routes/*"],
+      "@audit/*": ["src/audit/*"],
+      "@config/*": ["src/config/*"],
       "@dto/*": ["src/dto/*"]
     },
     "incremental": true,
