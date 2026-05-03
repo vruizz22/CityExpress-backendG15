@@ -22,4 +22,5 @@ model PackageEvent {
   constraints      Json?
   priorityClass    String
   payment          Float
+  senderCityId     String?
 }
