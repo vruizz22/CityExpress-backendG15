@@ -31,6 +31,17 @@ export function getCityName(code: string): string | undefined {
   return CITY_CATALOG.find((c) => c.code === code)?.name;
 }
 
+// Identidad central usada como origen de paquetes y destino de auditorías.
+export const CENTRAL_ID = 'central';
+
+// Routing key del broker para una ciudad dada.
+export const cityRoutingKey = (cityId: string) => `city.${cityId}`;
+
+/**
+ * Identificador de ciudad propio (lectura dinámica + validación estricta).
+ * Tira error si CITY_ID falta o no está en el catálogo. Úsenlo desde código
+ * runtime que pueda ser ejecutado bajo distintos process.env (incluyendo tests).
+ */
 export function getOwnCityId(): string {
   const code = process.env.CITY_ID;
   if (!code) {
@@ -45,3 +56,10 @@ export function getOwnCityId(): string {
   }
   return code;
 }
+
+/**
+ * CITY_ID estático leído al cargar el módulo. Mantiene compatibilidad con el
+ * código previo del routing (`import { CITY_ID } from '@/config/city.config'`).
+ * Si CITY_ID no está seteado, cae a 'TK3' como default existente.
+ */
+export const CITY_ID: string = process.env.CITY_ID ?? 'TK3';

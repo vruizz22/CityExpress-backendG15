@@ -24,6 +24,7 @@ model PackageEvent {
   constraints      Json?
   priorityClass    String
   payment          Float
+  senderCityId     String?
   receivedAt       DateTime  @default(now())
 
   @@index([packageId, receivedAt])

@@ -4,9 +4,10 @@ import { AppService } from './app.service';
 import { PackagesModule } from '@packages/packages.module';
 import { RoutesModule } from '@routes/routes.module';
 import { AuditModule } from '@audit/audit.module';
+import { RoutingModule } from '@/routing/routing.module';
 
 @Module({
-  imports: [PackagesModule, RoutesModule, AuditModule],
+  imports: [PackagesModule, RoutesModule, AuditModule, RoutingModule],
   controllers: [AppController],
   providers: [AppService],
 })

@@ -4,13 +4,15 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
-import { Prisma, PackageEvent, AuditEvent } from '@prisma/client';
+import { PackageEvent, AuditEvent } from '@prisma/client';
 import { PrismaService } from '@/prisma.service';
 import {
   CreatePackageDto,
+  CreatePackageDtoSchema,
   GetPackagesQuery,
   PackageView,
 } from '@dto/package.dto';
+import { buildPackageEventData } from '@packages/package-event.mapper';
 import { getOwnCityId } from '@config/city.config';
 
 export const DELIVERED_AUDIT_TYPE = 'delivered';
@@ -20,31 +22,19 @@ export class PackagesService {
   constructor(private prisma: PrismaService) {}
 
   async createPackage(data: CreatePackageDto) {
-    if (!data.packageBody) {
+    const parsed = CreatePackageDtoSchema.safeParse(data);
+    if (!parsed.success) {
       throw new BadRequestException('Formato de paquete inválido');
     }
 
     try {
-      const body = data.packageBody;
+      const body = parsed.data.packageBody;
       const result = await this.prisma.packageEvent.create({
-        data: {
-          idpk: data.idpk,
-          type: data.type,
-          packageId: body.id,
-          deliveryStrategy: body.deliveryStrategy,
-          maxHops: body.maxHops,
-          createdAt: new Date(body.createdAt),
-          deliverNotBefore: body.deliverNotBefore
-            ? new Date(body.deliverNotBefore)
-            : null,
-          originId: body.originId,
-          destinationId: body.destinationId,
-          metaContent: body.metaContent,
-          isMetaEncrypted: body.isMetaEncrypted,
-          constraints: (body.constraints ?? {}) as Prisma.InputJsonValue,
-          priorityClass: body.priorityClass,
-          payment: Number(body.payment),
-        },
+        data: buildPackageEventData({
+          idpk: parsed.data.idpk,
+          type: parsed.data.type,
+          packageBody: body,
+        }),
       });
       return result;
     } catch (err) {
