@@ -8,7 +8,7 @@
 
 ## Prompt
 
-Arreglar el backend para que funcione el broker. Usar el script en docs/listen-xxx.ts como template para crear el AmqpMessageBrokerService que implemente la interfaz MessageBrokerService. Credenciales city.tk3 / IqQT7bpQTiGeSiWElMoQduQ8.
+Arreglar el backend para que funcione el broker. Usar el script en docs/listen-xxx.ts como template para crear el AmqpMessageBrokerService que implemente la interfaz MessageBrokerService. Credenciales proporcionadas por el equipo docente (no se registran en logs de IA).
 
 ## Output
 
@@ -22,8 +22,8 @@ Se creó `src/messaging/amqp-message-broker.service.ts` con:
 
 Se modificó `RoutingModule` para inyectar `AmqpMessageBrokerService` cuando `RABBITMQ_URL` está definido (Noop en tests).
 
-Se actualizó `.env` con credenciales TK3:
-- `RABBITMQ_URL=amqps://city.tk3:IqQT7bpQTiGeSiWElMoQduQ8@broker.iic2173.org:5671/fulfillment`
+Se actualizó `.env` (no commiteado) con credenciales TK3:
+- `RABBITMQ_URL=amqps://city.tk3:<password>@broker.iic2173.org:5671/fulfillment`
 - `RABBITMQ_QUEUE=city.tk3.q`
 - `RABBITMQ_EXCHANGE=fulfillment.x`
 - `CITY_ID=TK3`
