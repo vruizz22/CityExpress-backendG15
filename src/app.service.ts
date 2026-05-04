@@ -3,6 +3,6 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class AppService {
   getHello(): string {
-    return 'QuackPackage API Running!';
+    return 'CityExpress G15 (TK3) API Running!';
   }
 }
