@@ -38,6 +38,8 @@ services:
     environment:
       - RABBITMQ_URL=${RABBITMQ_URL}
       - RABBITMQ_QUEUE=${RABBITMQ_QUEUE}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
+      - CITY_ID=${CITY_ID}
       - MASTER_API_URL=http://master:3000
     depends_on:
       - master
