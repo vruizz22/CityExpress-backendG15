@@ -5,6 +5,11 @@
 > Backend NestJS · Postgres · RabbitMQ · AWS EC2 + ECR + API Gateway · Frontend Vite.js (repo separado)
 
 ---
+Links importantes:
+- Frontend: https://app.andresitowan.com
+- API pública: https://api.andresitowan.com
+- Origen directo (no accesible sin shared secrete): https://origin-api.andresitowan.com
+---
 
 ## Tabla de contenidos
 
