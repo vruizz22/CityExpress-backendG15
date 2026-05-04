@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CITY_ID, CENTRAL_ID, cityRoutingKey } from '@/config/city.config';
 import {
   MESSAGE_BROKER,
@@ -19,6 +19,8 @@ import { PackageBody } from '@dto/package.dto';
 
 @Injectable()
 export class PackageService {
+  private readonly logger = new Logger(PackageService.name);
+
   constructor(
     @Inject(MESSAGE_BROKER) private readonly broker: MessageBrokerService,
     private readonly auditService: AuditService,
@@ -26,11 +28,17 @@ export class PackageService {
     private readonly packageEvents: PackageEventsRepository,
     private readonly pendingRepository: PendingPackagesRepository,
     private readonly deliveryService: PackageDeliveryService,
-  ) {}
+  ) { }
 
   async handlePackageTransit(message: unknown, now: Date = new Date()) {
+    this.logger.debug(
+      `Incoming package-transit raw: ${JSON.stringify(message)}`,
+    );
     const envelope = MessageEnvelopeSchema.safeParse(message);
     if (!envelope.success) {
+      this.logger.error(
+        `Envelope parse failed: ${JSON.stringify(envelope.error.issues)} | raw=${JSON.stringify(message)}`,
+      );
       throw new Error('Invalid message envelope.');
     }
     if (envelope.data.type !== 'package-transit') {
@@ -40,6 +48,9 @@ export class PackageService {
     const parsed = PackageTransitMessageSchema.safeParse(message);
     const senderCityId = envelope.data.cityId ?? null;
     if (!parsed.success) {
+      this.logger.error(
+        `PackageTransit parse failed: ${JSON.stringify(parsed.error.issues)} | raw=${JSON.stringify(message)}`,
+      );
       if (!senderCityId) {
         throw new Error('Missing sender cityId for ACK/NACK.');
       }
@@ -78,7 +89,7 @@ export class PackageService {
     }
 
     const pkg = normalizedPayload.packageBody;
-    if (pkg.destinationId === CITY_ID) {
+    if (pkg.destinationId.toUpperCase() === CITY_ID.toUpperCase()) {
       await this.auditService.reportReceived(pkg.id);
       const deliverNotBefore = this.parseOptionalDate(pkg.deliverNotBefore);
       if (deliverNotBefore && deliverNotBefore > now) {
