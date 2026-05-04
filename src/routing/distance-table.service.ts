@@ -10,6 +10,7 @@ import {
 } from '@/messaging/message-broker.interface';
 import { createBaseMessage } from '@/messaging/message.factory';
 import { DistanceTableMessageSchema } from '@/messaging/message.schemas';
+import { PrismaService } from '@/prisma.service';
 
 @Injectable()
 export class DistanceTableService implements OnModuleInit {
@@ -17,6 +18,7 @@ export class DistanceTableService implements OnModuleInit {
 
   constructor(
     @Inject(MESSAGE_BROKER) private readonly broker: MessageBrokerService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -33,16 +35,48 @@ export class DistanceTableService implements OnModuleInit {
     await this.broker.send(cityRoutingKey(CENTRAL_ID), message);
   }
 
-  updateFromMessage(message: unknown): void {
+  async updateFromMessage(message: unknown): Promise<void> {
     const parsed = DistanceTableMessageSchema.safeParse(message);
     if (!parsed.success) {
       throw new Error('Distance table message missing distances payload.');
     }
-    this.updateDistances(parsed.data.data.distances);
+    await this.updateDistances(parsed.data.data.distances);
   }
 
-  updateDistances(distances: Record<string, DistanceTableEntry>): void {
+  async updateDistances(
+    distances: Record<string, DistanceTableEntry>,
+  ): Promise<void> {
     this.distances = new Map(Object.entries(distances));
+    await this.persistDistances(distances);
+  }
+
+  private async persistDistances(
+    distances: Record<string, DistanceTableEntry>,
+  ): Promise<void> {
+    const entries = Object.values(distances);
+    if (entries.length === 0) {
+      return;
+    }
+    await this.prisma.$transaction(
+      entries.map((entry) =>
+        this.prisma.route.upsert({
+          where: { code: entry.destinationCode },
+          create: {
+            code: entry.destinationCode,
+            name: entry.destinationName,
+            enabled: entry.enabled,
+            distance: BigInt(Math.trunc(entry.distance)),
+            transportCost: BigInt(Math.trunc(entry.transportCost)),
+          },
+          update: {
+            name: entry.destinationName,
+            enabled: entry.enabled,
+            distance: BigInt(Math.trunc(entry.distance)),
+            transportCost: BigInt(Math.trunc(entry.transportCost)),
+          },
+        }),
+      ),
+    );
   }
 
   isDirectRouteAvailable(destinationId: string): boolean {
