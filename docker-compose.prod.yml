@@ -24,6 +24,10 @@ services:
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
       - NEW_RELIC_APP_NAME=cityexpress-master
       - NEW_RELIC_NO_CONFIG_FILE=true
+      - RABBITMQ_URL=${RABBITMQ_URL}
+      - RABBITMQ_QUEUE=${RABBITMQ_QUEUE}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
+      - CITY_ID=${CITY_ID}
     depends_on:
       - db
     ports:
