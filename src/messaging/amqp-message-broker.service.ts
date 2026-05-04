@@ -1,4 +1,9 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
 import amqp from 'amqplib';
 import { BaseMessage } from './message.types';
 import { MessageBrokerService } from './message-broker.interface';
@@ -17,7 +22,9 @@ export class AmqpMessageBrokerService
   private readonly url = process.env.RABBITMQ_URL!;
   private readonly queue = process.env.RABBITMQ_QUEUE!;
   private readonly exchange = process.env.RABBITMQ_EXCHANGE ?? 'fulfillment.x';
-  private readonly subscribedHandlers: Array<(msg: unknown) => Promise<void>> = [];
+  private readonly subscribedHandlers: Array<(msg: unknown) => Promise<void>> =
+    [];
+  private readonly onConnectCallbacks: Array<() => void> = [];
 
   async onModuleInit(): Promise<void> {
     await this.connect();
@@ -43,7 +50,9 @@ export class AmqpMessageBrokerService
       this.channel = await conn.createChannel();
       await this.channel.prefetch(10);
       this.retryIndex = 0;
-      this.logger.log(`Connected. Queue=${this.queue} Exchange=${this.exchange}`);
+      this.logger.log(
+        `Connected. Queue=${this.queue} Exchange=${this.exchange}`,
+      );
 
       conn.on('error', (err: Error) => {
         this.logger.error(`Broker connection error: ${err.message}`);
@@ -54,7 +63,9 @@ export class AmqpMessageBrokerService
 
       conn.on('close', () => {
         if (!this.shutdownRequested) {
-          this.logger.warn('Broker connection closed unexpectedly, reconnecting...');
+          this.logger.warn(
+            'Broker connection closed unexpectedly, reconnecting...',
+          );
           this.connection = null;
           this.channel = null;
           this.scheduleReconnect();
@@ -64,8 +75,13 @@ export class AmqpMessageBrokerService
       for (const handler of this.subscribedHandlers) {
         await this.startConsuming(handler);
       }
+      for (const cb of this.onConnectCallbacks) {
+        cb();
+      }
     } catch (err) {
-      this.logger.error(`Failed to connect to broker: ${(err as Error).message}`);
+      this.logger.error(
+        `Failed to connect to broker: ${(err as Error).message}`,
+      );
       this.scheduleReconnect();
     }
   }
@@ -73,13 +89,19 @@ export class AmqpMessageBrokerService
   private scheduleReconnect(): void {
     if (this.shutdownRequested) return;
     const delaySec =
-      FIBONACCI_DELAYS_S[Math.min(this.retryIndex, FIBONACCI_DELAYS_S.length - 1)] ?? 89;
+      FIBONACCI_DELAYS_S[
+        Math.min(this.retryIndex, FIBONACCI_DELAYS_S.length - 1)
+      ] ?? 89;
     this.retryIndex++;
-    this.logger.warn(`Reconnecting in ${delaySec}s (attempt ${this.retryIndex})...`);
+    this.logger.warn(
+      `Reconnecting in ${delaySec}s (attempt ${this.retryIndex})...`,
+    );
     setTimeout(() => void this.connect(), delaySec * 1000);
   }
 
-  private async startConsuming(handler: (msg: unknown) => Promise<void>): Promise<void> {
+  private async startConsuming(
+    handler: (msg: unknown) => Promise<void>,
+  ): Promise<void> {
     const ch = this.channel;
     if (!ch) return;
     await ch.consume(this.queue, (msg) => {
@@ -94,15 +116,22 @@ export class AmqpMessageBrokerService
     });
   }
 
-  async send<T extends BaseMessage>(routingKey: string, message: T): Promise<void> {
+  send<T extends BaseMessage>(routingKey: string, message: T): Promise<void> {
     if (!this.channel) {
       this.logger.warn(
         `Cannot send — no channel (routingKey=${routingKey}, type=${message.type})`,
       );
-      return;
+      return Promise.resolve();
     }
     const content = Buffer.from(JSON.stringify(message));
-    this.channel.publish(this.exchange, routingKey, content, { persistent: true });
+    this.channel.publish(this.exchange, routingKey, content, {
+      persistent: true,
+    });
+    return Promise.resolve();
+  }
+
+  onConnect(cb: () => void): void {
+    this.onConnectCallbacks.push(cb);
   }
 
   async subscribe<T extends BaseMessage>(
