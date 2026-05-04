@@ -14,12 +14,16 @@ import {
 } from '@dto/package.dto';
 import { buildPackageEventData } from '@packages/package-event.mapper';
 import { getOwnCityId } from '@config/city.config';
+import { AuditService } from '@/routing/audit.service';
 
 export const DELIVERED_AUDIT_TYPE = 'delivered';
 
 @Injectable()
 export class PackagesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   async createPackage(data: CreatePackageDto) {
     const parsed = CreatePackageDtoSchema.safeParse(data);
@@ -184,6 +188,7 @@ export class PackagesService {
           type: DELIVERED_AUDIT_TYPE,
         },
       });
+      await this.auditService.reportDelivered(packageId);
       return {
         packageId,
         delivered: true,
