@@ -31,18 +31,9 @@ services:
     networks:
       - cityexpress-net
 
-  connector:
-    image: ${ECR_REGISTRY}/cityexpress-connector:${IMAGE_TAG}
-    container_name: cityexpress_connector
-    restart: unless-stopped
-    environment:
-      - RABBITMQ_URL=${RABBITMQ_URL}
-      - RABBITMQ_QUEUE=${RABBITMQ_QUEUE}
-      - MASTER_API_URL=http://master:3000
-    depends_on:
-      - master
-    networks:
-      - cityexpress-net
+  # connector E0 deshabilitado en E1: el master NestJS maneja el broker AMQP directamente
+  # connector:
+  #   image: ${ECR_REGISTRY}/cityexpress-connector:${IMAGE_TAG}
 
 volumes:
   pgdata:

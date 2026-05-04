@@ -8,6 +8,7 @@ import {
   MESSAGE_BROKER,
   MessageBrokerService,
 } from '@/messaging/message-broker.interface';
+import { AmqpMessageBrokerService } from '@/messaging/amqp-message-broker.service';
 import { createBaseMessage } from '@/messaging/message.factory';
 import { DistanceTableMessageSchema } from '@/messaging/message.schemas';
 import { PrismaService } from '@/prisma.service';
@@ -22,6 +23,9 @@ export class DistanceTableService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    if (this.broker instanceof AmqpMessageBrokerService) {
+      this.broker.onConnect(() => void this.requestInitialTable());
+    }
     await this.requestInitialTable();
   }
 
