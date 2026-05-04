@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { PackagesService } from '@packages/packages.service';
 import { PrismaService } from '@/prisma.service';
+import { AuditService } from '@/routing/audit.service';
 import { CreatePackageDto } from '@dto/package.dto';
 
 type PrismaMock = {
@@ -24,6 +25,7 @@ const OWN_CITY = 'HGW';
 describe('PackagesService', () => {
   let service: PackagesService;
   let prisma: PrismaMock;
+  let auditService: { reportDelivered: jest.Mock };
   const originalCityId = process.env.CITY_ID;
 
   beforeAll(() => {
@@ -53,11 +55,13 @@ describe('PackagesService', () => {
         create: jest.fn(),
       },
     };
+    auditService = { reportDelivered: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PackagesService,
         { provide: PrismaService, useValue: prisma },
+        { provide: AuditService, useValue: auditService },
       ],
     }).compile();
 
@@ -423,7 +427,7 @@ describe('PackagesService', () => {
       expect(prisma.auditEvent.create).not.toHaveBeenCalled();
     });
 
-    it('creates a delivered audit and returns idpk', async () => {
+    it('creates a delivered audit, reports to broker, and returns idpk', async () => {
       prisma.packageEvent.findFirst.mockResolvedValue(ownPackage);
       prisma.auditEvent.findFirst.mockResolvedValue(null);
       prisma.auditEvent.create.mockResolvedValue({
@@ -449,6 +453,7 @@ describe('PackagesService', () => {
           type: 'delivered',
         },
       });
+      expect(auditService.reportDelivered).toHaveBeenCalledWith('pkg-1');
     });
 
     it('uses caller-provided idpk when present', async () => {
