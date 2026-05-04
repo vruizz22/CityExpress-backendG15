@@ -4,7 +4,7 @@ import {
   OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
-import amqp from 'amqplib';
+import * as amqp from 'amqplib';
 import { BaseMessage } from './message.types';
 import { MessageBrokerService } from './message-broker.interface';
 
