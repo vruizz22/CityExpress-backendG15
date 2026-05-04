@@ -68,6 +68,10 @@
 
 ## 2. Arquitectura
 
+UML Formal completo, imagen svg:
+
+![arquitectura](docs/arquitectura.svg)
+
 ```mermaid
 graph LR
     subgraph cloud[AWS Cloud]
@@ -102,7 +106,7 @@ graph LR
     CONN -.APM.-> NR
 ```
 
-> Detalle de NFRs priorizados, estilos arquitectónicos y diagramas UML formales en [`docs/architecture.md`](./docs/architecture.md). El UML formal `.drawio` (RDOC01) se completa en M3.
+> Detalle de NFRs priorizados, estilos arquitectónicos y diagramas UML formales en [`docs/architecture.md`](./docs/architecture.md).
 
 ---
 
