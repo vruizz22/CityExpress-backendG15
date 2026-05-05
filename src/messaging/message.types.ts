@@ -22,7 +22,7 @@ export interface DistanceTableEntry {
 }
 
 export interface DistanceTableMessage extends BaseMessage {
-  type: 'distance-table';
+  type: 'distance-table' | 'cost-update';
   data: {
     distances: Record<string, DistanceTableEntry>;
   };

@@ -45,7 +45,7 @@ export const DistanceTableEntrySchema = z.object({
 });
 
 export const DistanceTableMessageSchema = BaseMessageSchema.extend({
-  type: z.literal('distance-table'),
+  type: z.enum(['distance-table', 'cost-update']),
   data: z.object({
     distances: z.record(z.string(), DistanceTableEntrySchema),
   }),
