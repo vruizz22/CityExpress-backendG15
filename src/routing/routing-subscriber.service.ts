@@ -31,7 +31,10 @@ export class RoutingSubscriberService implements OnModuleInit {
 
       this.logger.debug(`Routed type=${envelope.data.type}`);
 
-      if (envelope.data.type === 'distance-table') {
+      if (
+        envelope.data.type === 'distance-table' ||
+        envelope.data.type === 'cost-update'
+      ) {
         await this.distanceTable.updateFromMessage(message);
         await this.packageService.processPendingRoutes();
         return;
