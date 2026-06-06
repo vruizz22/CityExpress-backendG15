@@ -2,14 +2,10 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copiar dependencias e instalarlas
-COPY package*.json ./
-RUN npm install
-
-# Copiar el resto del código fuente (la carpeta src y el tsconfig)
+# Copiamos absolutamente todo primero
 COPY . .
 
-# Compilar TypeScript a JavaScript
-RUN npm run build
+# Unimos la instalación y la compilación en una sola capa
+RUN npm install && npm run build
 
 EXPOSE 3001

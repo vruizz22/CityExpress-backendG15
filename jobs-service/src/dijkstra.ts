@@ -102,6 +102,46 @@ function buildDijkstraResults(
   return result;
 }
 
+function getClosestNode(unvisited: Set<string>, distances: Record<string, number>): string | null {
+  let closest: string | null = null;
+  let minDistance = Infinity;
+
+  for (const node of unvisited) {
+    const currentDist = distances[node]; 
+    if (currentDist < minDistance) {
+      minDistance = currentDist;
+      closest = node;
+    }
+  }
+  
+  return closest;
+}
+
+// --- Helper 2: Actualiza las distancias de los vecinos de un nodo ---
+function updateNeighbors(
+  currentNode: string,
+  graph: Graph,
+  metric: 'distance' | 'transportCost',
+  unvisited: Set<string>,
+  distances: Record<string, number>,
+  previous: Record<string, string | null>
+) {
+  const neighbors = graph[currentNode] || [];
+  
+  for (const edge of neighbors) {
+    if (!edge.enabled || !unvisited.has(edge.code)) continue;
+
+    const edgeWeight = edge[metric];
+    const currentDist = distances[currentNode];
+    const tentativeDistance = currentDist + edgeWeight;
+
+    if (tentativeDistance < (distances[edge.code] ?? Infinity)) {
+      distances[edge.code] = tentativeDistance;
+      previous[edge.code] = currentNode;
+    }
+  }
+}
+
 
 export function runDijkstra(graph: Graph, source: string, metric: 'distance' | 'transportCost'): Record<string, DijkstraResult> {
   const distances: Record<string, number> = {};
@@ -115,38 +155,16 @@ export function runDijkstra(graph: Graph, source: string, metric: 'distance' | '
     unvisited.add(city);
   }
 
+  // Bucle principal sin anidaciones profundas
   while (unvisited.size > 0) {
-    let currentNode: string | null = null;
-    let minDistance = Infinity;
-
-    // Buscar el nodo más cercano
-    for (const node of unvisited) {
-      const currentDist = distances[node]; 
-      if (currentDist < minDistance) {
-        minDistance = currentDist;
-        currentNode = node;
-      }
-    }
+    const currentNode = getClosestNode(unvisited, distances);
 
     if (currentNode === null) break;
 
     unvisited.delete(currentNode);
-
-    const neighbors = graph[currentNode] || [];
-    for (const edge of neighbors) {
-      if (!edge.enabled || !unvisited.has(edge.code)) continue;
-
-      const edgeWeight = edge[metric];
-      const currentDist = distances[currentNode];
-      const tentativeDistance = currentDist + edgeWeight;
-
-      if (tentativeDistance < (distances[edge.code] ?? Infinity)) {
-        distances[edge.code] = tentativeDistance;
-        previous[edge.code] = currentNode;
-      }
-    }
+    
+    updateNeighbors(currentNode, graph, metric, unvisited, distances, previous);
   }
 
-  
   return buildDijkstraResults(graph, source, previous);
 }
