@@ -17,8 +17,7 @@ RUN pnpm run build
 FROM node:20-alpine
 WORKDIR /usr/src/app
 
-RUN corepack enable pnpm
-RUN corepack prepare pnpm@10.11.1 --activate
+RUN corepack enable pnpm && corepack prepare pnpm@10.11.1 --activate
 COPY package.json pnpm-lock.yaml ./
 
 RUN pnpm install --prod --frozen-lockfile
