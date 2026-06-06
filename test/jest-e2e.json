@@ -6,4 +6,10 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   }
+  ,
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/../src/$1",
+    "^@packages/(.*)$": "<rootDir>/../src/packages/$1",
+    "^@dto/(.*)$": "<rootDir>/../src/dto/$1"
+  }
 }

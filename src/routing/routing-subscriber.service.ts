@@ -23,7 +23,10 @@ export class RoutingSubscriberService implements OnModuleInit {
         return;
       }
 
-      if (envelope.data.type === 'distance-table') {
+      if (
+        envelope.data.type === 'distance-table' ||
+        envelope.data.type === 'cost-update'
+      ) {
         this.distanceTable.updateFromMessage(message);
         await this.packageService.processPendingRoutes();
         return;

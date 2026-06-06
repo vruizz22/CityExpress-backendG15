@@ -22,7 +22,18 @@ import { RoutingSubscriberService } from '@/routing/routing-subscriber.service';
     PendingPackagesRepository,
     PackageService,
     RoutingSubscriberService,
-    { provide: MESSAGE_BROKER, useClass: NoopMessageBrokerService },
+    {
+      provide: MESSAGE_BROKER,
+      useFactory: () => {
+        if (process.env.USE_AMQP === 'true') {
+          // require lazily to avoid static TS import resolution during tests
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { AmqpMessageBrokerService } = require('../messaging/amqp-message-broker.service');
+          return new AmqpMessageBrokerService();
+        }
+        return new NoopMessageBrokerService();
+      },
+    },
     { provide: PackageDeliveryService, useClass: NoopPackageDeliveryService },
   ],
   exports: [PackageService, DistanceTableService, AuditService],
