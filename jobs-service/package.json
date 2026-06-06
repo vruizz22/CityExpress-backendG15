@@ -1,0 +1,30 @@
+{
+  "name": "jobs-service",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start:master": "ts-node src/master.ts",
+    "start:worker": "ts-node src/worker.ts",
+    "dev:master": "nodemon src/master.ts",
+    "dev:worker": "nodemon src/worker.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bullmq": "^5.78.0",
+    "express": "^5.2.1",
+    "ioredis": "^5.11.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.2",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}
