@@ -1,10 +1,13 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-return,@typescript-eslint/no-unsafe-argument */
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const request = require('supertest');
-const amqp = require('amqplib');
+import * as amqp from 'amqplib';
 import { AppModule } from '../src/app.module';
 
-const RABBIT_URL = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
+const RABBIT_URL =
+  process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
 const EXCHANGE = process.env.RABBITMQ_EXCHANGE || 'fulfillment.x';
 const ROUTING_KEY = process.env.ROUTING_KEY || 'city.TK3';
 
@@ -17,15 +20,19 @@ describe('AMQP integration (e2e)', () => {
     process.env.RABBITMQ_QUEUE = 'test.q';
     process.env.RABBITMQ_EXCHANGE = EXCHANGE;
     process.env.USE_AMQP = 'true';
+    // ensure tests use local test postgres instance
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL ||
+      'postgresql://postgres:password@localhost:5433/cityexpress?schema=public';
 
     // Pre-create exchange and queue and bind so the broker service can attach
-    const conn = await amqp.connect(RABBIT_URL);
-    const ch = await conn.createChannel();
+    const conn = (await amqp.connect(RABBIT_URL)) as unknown as amqp.Connection;
+    const ch = (await (conn as any).createChannel()) as amqp.Channel;
     await ch.assertExchange(EXCHANGE, 'topic', { durable: true });
     await ch.assertQueue(process.env.RABBITMQ_QUEUE, { durable: true });
     await ch.bindQueue(process.env.RABBITMQ_QUEUE, EXCHANGE, ROUTING_KEY);
     await ch.close();
-    await conn.close();
+    await (conn as any).close();
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -41,8 +48,8 @@ describe('AMQP integration (e2e)', () => {
 
   it('processes cost-update and exposes routes', async () => {
     // publish test message
-    const conn = await amqp.connect(RABBIT_URL);
-    const ch = await conn.createChannel();
+    const conn = (await amqp.connect(RABBIT_URL)) as unknown as amqp.Connection;
+    const ch = (await (conn as any).createChannel()) as amqp.Channel;
     await ch.assertExchange(EXCHANGE, 'topic', { durable: true });
 
     const msg = {
@@ -67,7 +74,7 @@ describe('AMQP integration (e2e)', () => {
       persistent: true,
     });
     await ch.close();
-    await conn.close();
+    await (conn as any).close();
 
     // poll GET /routes until we see HGW
     const server = app.getHttpServer();

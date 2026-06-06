@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-return,@typescript-eslint/no-unsafe-call */
 import { Module } from '@nestjs/common';
 import { PrismaService } from '@/prisma.service';
 import { MESSAGE_BROKER } from '@/messaging/message-broker.interface';
@@ -24,11 +25,10 @@ import { RoutingSubscriberService } from '@/routing/routing-subscriber.service';
     RoutingSubscriberService,
     {
       provide: MESSAGE_BROKER,
-      useFactory: () => {
+      useFactory: async () => {
         if (process.env.USE_AMQP === 'true') {
-          // require lazily to avoid static TS import resolution during tests
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const { AmqpMessageBrokerService } = require('../messaging/amqp-message-broker.service');
+          const mod = await import('../messaging/amqp-message-broker.service');
+          const { AmqpMessageBrokerService } = mod as any;
           return new AmqpMessageBrokerService();
         }
         return new NoopMessageBrokerService();
