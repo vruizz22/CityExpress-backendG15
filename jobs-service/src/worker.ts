@@ -4,7 +4,7 @@ import { computeOptimalRoutes, Graph } from './dijkstra';
 
 const connection = {
   host: process.env.REDIS_HOST || 'redis',
-  port: parseInt(process.env.REDIS_PORT || '6379', 10)
+  port: Number.parseInt(process.env.REDIS_PORT || '6379', 10)
 };
 
 interface JobPayload {

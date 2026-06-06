@@ -24,16 +24,15 @@ export class RoutingOrchestratorService {
       Record<string, { distance: number; price: number }>
     > = {};
 
-    for (const [key, entry] of Object.entries(snapshot)) {
+    for (const entry of Object.values(snapshot)) {
       if (!entry.enabled) continue; // Ignoramos nodos deshabilitados
 
       // Aseguramos que el nodo origen exista en nuestro grafo simulado
-      // (Asumiendo que mapeas conexiones entre ciudades)
       if (!graph[CITY_ID]) graph[CITY_ID] = {};
 
       // Creamos la conexión desde nuestra ciudad actual hacia el destino
       graph[CITY_ID][entry.destinationCode] = {
-        distance: entry.distance ?? 0, // Ajusta estos campos según tus DistanceTableEntry reales
+        distance: entry.distance ?? 0, 
         price: entry.transportCost ?? 0,
       };
     }

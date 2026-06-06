@@ -1,8 +1,7 @@
 FROM node:20-alpine AS builder
 
 # Habilitar corepack para poder usar la versión de pnpm correcta
-RUN corepack enable pnpm
-RUN corepack prepare pnpm@10.11.1 --activate
+RUN corepack enable pnpm && corepack prepare pnpm@10.11.1 --activate
 
 WORKDIR /usr/src/app
 

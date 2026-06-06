@@ -4,12 +4,13 @@ import { Queue } from 'bullmq';
 import { z } from 'zod';
 
 const app = express();
+app.disable('x-powered-by');
 app.use(express.json());
 
 // Configuración de conexión a Redis
 const connection = {
   host: process.env.REDIS_HOST || 'redis',
-  port: parseInt(process.env.REDIS_PORT || '6379', 10)
+  port: Number.parseInt(process.env.REDIS_PORT || '6379', 10)
 };
 
 // Instanciamos la cola de BullMQ
@@ -48,6 +49,7 @@ app.post('/job', async (req, res) => {
 
     res.status(202).json({ jobId: job.id, status: 'queued' });
   } catch (error) {
+    console.error('[JobMaster] Fallo al encolar el trabajo en Redis:', error); 
     res.status(500).json({ error: 'Error interno al encolar el trabajo' });
   }
 });
@@ -73,6 +75,7 @@ app.get('/job/:id', async (req, res) => {
       error: failedReason || null
     });
   } catch (error) {
+    console.error('[JobMaster] Fallo al consultar el estado del trabajo:', error); 
     res.status(500).json({ error: 'Error al consultar el trabajo' });
   }
 });
