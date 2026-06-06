@@ -95,27 +95,32 @@ export class PackageService {
       return;
     }
 
+    
     const forwardedPackage = {
       ...pkg,
       maxHops: pkg.maxHops - 1,
     };
 
-    if (this.distanceTable.isDirectRouteAvailable(pkg.destinationId)) {
-      await this.sendPackage(pkg.destinationId, forwardedPackage);
-      await this.auditService.reportTransit(pkg.id, pkg.destinationId);
-      return;
-    }
 
-    const excluded = new Set<string>([CENTRAL_ID, resolvedSenderCityId]);
-    const nextCityId =
-      this.distanceTable.pickRandomEnabledDestination(excluded);
+    const constraints = pkg.constraints as Record<string, unknown> | undefined;
+    const criteria = constraints?.criteria === 'price' ? 'price' : 'distance';
+
+    const nextCityId = this.distanceTable.getNextHop(pkg.destinationId, criteria);
+
+
     if (!nextCityId) {
       await this.pendingRepository.savePendingRoute(normalizedPayload);
       return;
     }
 
     await this.sendPackage(nextCityId, forwardedPackage);
-    await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
+
+
+    if (nextCityId === pkg.destinationId) {
+      await this.auditService.reportTransit(pkg.id, pkg.destinationId);
+    } else {
+      await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
+    }
   }
 
   async processPendingDeliveries(now: Date = new Date()): Promise<void> {
@@ -143,26 +148,25 @@ export class PackageService {
       }
 
       const forwardedPackage = { ...pkg, maxHops: pkg.maxHops - 1 };
-      if (this.distanceTable.isDirectRouteAvailable(pkg.destinationId)) {
-        await this.sendPackage(pkg.destinationId, forwardedPackage);
-        await this.auditService.reportTransit(pkg.id, pkg.destinationId);
-        await this.pendingRepository.removePending(record.idpk);
-        continue;
-      }
+      
+      // --- NUEVA LÓGICA DE RUTEO POR CRITERIO (Para paquetes pendientes) ---
+      const constraints = pkg.constraints as Record<string, unknown> | undefined;
+      const criteria = constraints?.criteria === 'price' ? 'price' : 'distance';
 
-      const senderCityId: string = record.senderCityId ?? pkg.originId;
-      if (!senderCityId) {
-        throw new Error('Missing sender cityId for pending route.');
-      }
-      const excluded = new Set<string>([CENTRAL_ID, senderCityId]);
-      const nextCityId =
-        this.distanceTable.pickRandomEnabledDestination(excluded);
+      const nextCityId = this.distanceTable.getNextHop(pkg.destinationId, criteria);
+
       if (!nextCityId) {
-        continue;
+        continue; // Sigue pendiente si aún no hay ruta
       }
 
       await this.sendPackage(nextCityId, forwardedPackage);
-      await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
+      
+      if (nextCityId === pkg.destinationId) {
+        await this.auditService.reportTransit(pkg.id, pkg.destinationId);
+      } else {
+        await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
+      }
+      
       await this.pendingRepository.removePending(record.idpk);
     }
   }
