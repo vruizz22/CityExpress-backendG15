@@ -29,7 +29,12 @@ describe('DistanceTableService', () => {
       send: jest.fn(),
       subscribe: jest.fn(),
     };
-    const service = new DistanceTableService(broker);
+    const mockRoutingOrchestrator = {
+      triggerRouteRecomputation: jest.fn(),
+    } as any;
+
+
+    const service = new DistanceTableService(broker, mockRoutingOrchestrator);
 
     await service.requestInitialTable();
 
@@ -47,7 +52,12 @@ describe('DistanceTableService', () => {
       send: jest.fn(),
       subscribe: jest.fn(),
     };
-    const service = new DistanceTableService(broker);
+    const mockRoutingOrchestrator = {
+      triggerRouteRecomputation: jest.fn(),
+    } as any;
+
+
+    const service = new DistanceTableService(broker, mockRoutingOrchestrator);
     const message: DistanceTableMessage = {
       idpk: 'idpk-1',
       msgId: 'msg-1',
@@ -67,7 +77,12 @@ describe('DistanceTableService', () => {
       send: jest.fn(),
       subscribe: jest.fn(),
     };
-    const service = new DistanceTableService(broker);
+    const mockRoutingOrchestrator = {
+      triggerRouteRecomputation: jest.fn(),
+    } as any;
+
+
+    const service = new DistanceTableService(broker, mockRoutingOrchestrator);
     service.updateDistances(buildDistances());
 
     const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
@@ -82,7 +97,12 @@ describe('DistanceTableService', () => {
       send: jest.fn(),
       subscribe: jest.fn(),
     };
-    const service = new DistanceTableService(broker);
+    const mockRoutingOrchestrator = {
+      triggerRouteRecomputation: jest.fn(),
+    } as any;
+
+
+    const service = new DistanceTableService(broker, mockRoutingOrchestrator);
     const message = {
       idpk: 'idpk-1',
       msgId: 'msg-1',

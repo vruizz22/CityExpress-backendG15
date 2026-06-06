@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CITY_ID, CENTRAL_ID, cityRoutingKey } from '@/config/city.config';
+import { CITY_ID, cityRoutingKey } from '@/config/city.config';
 import {
   MESSAGE_BROKER,
   MessageBrokerService,
@@ -95,18 +95,18 @@ export class PackageService {
       return;
     }
 
-    
     const forwardedPackage = {
       ...pkg,
       maxHops: pkg.maxHops - 1,
     };
 
-
     const constraints = pkg.constraints as Record<string, unknown> | undefined;
     const criteria = constraints?.criteria === 'price' ? 'price' : 'distance';
 
-    const nextCityId = this.distanceTable.getNextHop(pkg.destinationId, criteria);
-
+    const nextCityId = this.distanceTable.getNextHop(
+      pkg.destinationId,
+      criteria,
+    );
 
     if (!nextCityId) {
       await this.pendingRepository.savePendingRoute(normalizedPayload);
@@ -114,7 +114,6 @@ export class PackageService {
     }
 
     await this.sendPackage(nextCityId, forwardedPackage);
-
 
     if (nextCityId === pkg.destinationId) {
       await this.auditService.reportTransit(pkg.id, pkg.destinationId);
@@ -148,25 +147,30 @@ export class PackageService {
       }
 
       const forwardedPackage = { ...pkg, maxHops: pkg.maxHops - 1 };
-      
+
       // --- NUEVA LÓGICA DE RUTEO POR CRITERIO (Para paquetes pendientes) ---
-      const constraints = pkg.constraints as Record<string, unknown> | undefined;
+      const constraints = pkg.constraints as
+        | Record<string, unknown>
+        | undefined;
       const criteria = constraints?.criteria === 'price' ? 'price' : 'distance';
 
-      const nextCityId = this.distanceTable.getNextHop(pkg.destinationId, criteria);
+      const nextCityId = this.distanceTable.getNextHop(
+        pkg.destinationId,
+        criteria,
+      );
 
       if (!nextCityId) {
         continue; // Sigue pendiente si aún no hay ruta
       }
 
       await this.sendPackage(nextCityId, forwardedPackage);
-      
+
       if (nextCityId === pkg.destinationId) {
         await this.auditService.reportTransit(pkg.id, pkg.destinationId);
       } else {
         await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
       }
-      
+
       await this.pendingRepository.removePending(record.idpk);
     }
   }

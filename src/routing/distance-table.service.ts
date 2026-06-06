@@ -12,7 +12,6 @@ import { createBaseMessage } from '@/messaging/message.factory';
 import { DistanceTableMessageSchema } from '@/messaging/message.schemas';
 import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
 
-
 export interface ComputedRoute {
   nextHop: string | null;
   totalDistance: number;
@@ -28,7 +27,6 @@ export interface RoutingTables {
 @Injectable()
 export class DistanceTableService implements OnModuleInit {
   private distances = new Map<string, DistanceTableEntry>();
-  
 
   private computedRoutes: RoutingTables | null = null;
 
@@ -60,37 +58,38 @@ export class DistanceTableService implements OnModuleInit {
   }
 
   updateDistances(distances: Record<string, DistanceTableEntry>): void {
-  this.distances = new Map(Object.entries(distances));
-  
-  // Cada vez que el broker nos mande distancias frescas, 
-  // le pedimos al orquestador que despache el cálculo al microservicio
-  this.routingOrchestrator.triggerRouteRecomputation(); 
-}
+    this.distances = new Map(Object.entries(distances));
+
+    // Cada vez que el broker nos mande distancias frescas,
+    // le pedimos al orquestador que despache el cálculo al microservicio
+    this.routingOrchestrator.triggerRouteRecomputation();
+  }
 
   updateComputedRoutes(routes: RoutingTables): void {
     this.computedRoutes = routes;
     console.log('Nuevas tablas de enrutamiento aplicadas exitosamente.');
   }
 
-
-  getNextHop(destinationId: string, criteria: 'price' | 'distance'): string | null {
-
+  getNextHop(
+    destinationId: string,
+    criteria: 'price' | 'distance',
+  ): string | null {
     if (!this.computedRoutes) {
-      console.warn(`getNextHop: Las tablas de enrutamiento aún no han sido calculadas.`);
+      console.warn(
+        `getNextHop: Las tablas de enrutamiento aún no han sido calculadas.`,
+      );
       return null;
     }
 
-    const tableToLook = criteria === 'price' 
-      ? this.computedRoutes.byPrice 
-      : this.computedRoutes.byDistance;
-
+    const tableToLook =
+      criteria === 'price'
+        ? this.computedRoutes.byPrice
+        : this.computedRoutes.byDistance;
 
     const route = tableToLook[destinationId];
 
     return route?.nextHop ?? null;
   }
-
-  
 
   isDirectRouteAvailable(destinationId: string): boolean {
     return this.distances.get(destinationId)?.enabled === true;
