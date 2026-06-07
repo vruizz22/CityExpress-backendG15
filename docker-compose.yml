@@ -29,6 +29,9 @@ services:
       - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
       - CITY_ID=${CITY_ID}
       - USE_AMQP=true
+      - AUTH0_ISSUER=${AUTH0_ISSUER:-https://frontendg15cityexpress.us.auth0.com/}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-https://api.andresitowan.com}
+      - AUTH0_ROLES_CLAIM=${AUTH0_ROLES_CLAIM:-https://cityexpress/roles}
     depends_on:
       - db
     networks:
