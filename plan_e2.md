@@ -89,10 +89,10 @@ El PR #21 agrega:
 
 No reconstruyas: adopta el `jobs-service/` del PR #21. Tu trabajo:
 
-1. **Heartbeat proxy en el backend** (para RNF04 del front, que pega a `api.andresitowan.com/heartbeat`):
-   - Agrega `GET /heartbeat` en el backend NestJS que haga `fetch(${JOB_MASTER_URL}/heartbeat)` y devuelva `{ jobsService: true|false }` (con timeout corto y try/catch → `false` si no responde).
-   - Env `JOB_MASTER_URL` (ya lo usa el orquestador; ya está en `docker-compose.yml` dev apuntando a `http://job-master:3001`). Falta definir su valor en prod cuando despliegues el jobs-service (RNF06).
-   - Agrega la ruta `/heartbeat` (auth NONE o JWT) en API Gateway (§ usa [docs/deploy.md §10](docs/deploy.md)).
+1. ✅ **Heartbeat proxy en el backend (HECHO, 2026-06-07)** — para RNF04 del front, que pega a `api.andresitowan.com/heartbeat`:
+   - ✅ Módulo `src/jobs/`: `GET /heartbeat` → `JobsService.isJobsServiceUp()` hace `fetch(${JOB_MASTER_URL}/heartbeat)` con timeout (`AbortSignal.timeout(2000)`) + try/catch → `{ jobsService: true|false }` (siempre 200). Con tests (controller + service).
+   - ✅ Env `JOB_MASTER_URL` (ya en `docker-compose.yml` dev → `http://job-master:3001`). Falta su valor en prod al desplegar el jobs-service (RNF06/RNF08).
+   - ⏳ **Deploy:** agregar la ruta `/heartbeat` (auth NONE) en API Gateway (ver [docs/deploy.md §10](docs/deploy.md)) para que el front la alcance vía `api.andresitowan.com/heartbeat`.
 2. **Persistir resultados (RNF07):** cuando el orquestador recibe el resultado, además de `updateComputedRoutes` en memoria, persistir en `CalculatedRoute` (coordinar con Andre). Así sobrevive reinicios y sirve a la cotización.
 3. **Idempotencia / anti-spam:** el recálculo se dispara en **cada** `updateDistances`. Agrega debounce (p.ej. no relanzar si hay un job en vuelo o si pasó <N s) para no saturar (ojo con la política de "abuso de mensajería" del enunciado).
 4. **Robustez (RNF03):** ya hay retries en BullMQ (`attempts:3`, backoff) y polling con límite. Verifica que `FAILED` se propague y que el backend no quede colgado.
