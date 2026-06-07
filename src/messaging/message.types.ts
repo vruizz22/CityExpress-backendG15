@@ -53,3 +53,27 @@ export interface AuditMessage extends BaseMessage {
 export interface AckMessage extends BaseMessage {
   type: 'ack' | 'nack';
 }
+
+export type PaymentStatus = 'TRYING' | 'SUCCESS' | 'FAILED';
+
+export interface PaymentStatusData {
+  status: PaymentStatus;
+  paymentId: string;
+  amount: number;
+  currency: string;
+  destinationId: string;
+  criteria: string;
+  routeMetricCost: number;
+  maxHops: number;
+  authorizationCode?: string;
+  transactionDate?: string;
+  reason?: string;
+}
+
+// RF03
+export interface PaymentStatusMessage extends BaseMessage {
+  type: 'payment-status';
+  pkgId: string;
+  payment_token: string;
+  data: PaymentStatusData;
+}
