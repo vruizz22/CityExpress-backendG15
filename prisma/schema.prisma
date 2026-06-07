@@ -53,5 +53,91 @@ model User {
   id        String   @id @default(uuid())
   subject   String   @unique
   email     String?
+  role      String   @default("user")
   createdAt DateTime @default(now())
+}
+
+// RF01
+model UserShipment {
+  id               String    @id @default(uuid())
+  ownerSubject     String
+  packageId        String    @unique // RF04
+  originId         String
+  destinationId    String
+  height           Int
+  width            Int
+  depth            Int
+  criteria         String
+  maxHops          Int
+  deliveryStrategy String    @default("random")
+  priorityClass    String    @default("medium")
+  deliverNotBefore DateTime?
+  metaContent      String?
+  // RF02/RF03
+  routeMetricCost  BigInt
+  fPrice           Float
+  amount           Int
+  hops             Int
+  nextHop          String?
+  routePath        Json
+  status           String    @default("pending-payment")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([ownerSubject, createdAt])
+}
+
+// RF03
+model Payment {
+  id                String    @id @default(uuid())
+  shipmentId        String
+  ownerSubject      String
+  buyOrder          String    @unique
+  webpayToken       String?   @unique
+  sessionId         String
+  redirectUrl       String?
+  amount            Int
+  currency          String    @default("CLP")
+  status            String    @default("TRYING")
+  authorizationCode String?
+  reason            String?
+  transactionDate   DateTime?
+  responseRaw       Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([shipmentId])
+  @@index([ownerSubject])
+}
+
+model Job {
+  id        String   @id @default(uuid())
+  type      String
+  status    String   @default("pending")
+  payload   Json?
+  result    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// RF06
+model ReceivedTable {
+  sourceCityId String   @id
+  distances    Json
+  receivedAt   DateTime @default(now())
+}
+
+// RF02
+model CalculatedRoute {
+  id              String   @id @default(uuid())
+  destinationCode String
+  criteria        String
+  nextHop         String?
+  routeMetricCost BigInt?
+  hops            Int?
+  path            Json
+  reachable       Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+
+  @@unique([destinationCode, criteria])
 }
