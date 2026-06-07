@@ -11,15 +11,29 @@ import {
 import { AmqpMessageBrokerService } from '@/messaging/amqp-message-broker.service';
 import { createBaseMessage } from '@/messaging/message.factory';
 import { DistanceTableMessageSchema } from '@/messaging/message.schemas';
-import { PrismaService } from '@/prisma.service';
+import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
+
+export interface ComputedRoute {
+  nextHop: string | null;
+  totalDistance: number;
+  totalCost: number;
+  path: string[];
+}
+
+export interface RoutingTables {
+  byDistance: Record<string, ComputedRoute>;
+  byPrice: Record<string, ComputedRoute>;
+}
 
 @Injectable()
 export class DistanceTableService implements OnModuleInit {
   private distances = new Map<string, DistanceTableEntry>();
 
+  private computedRoutes: RoutingTables | null = null;
+
   constructor(
     @Inject(MESSAGE_BROKER) private readonly broker: MessageBrokerService,
-    private readonly prisma: PrismaService,
+    private readonly routingOrchestrator: RoutingOrchestratorService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -39,48 +53,46 @@ export class DistanceTableService implements OnModuleInit {
     await this.broker.send(cityRoutingKey(CENTRAL_ID), message);
   }
 
-  async updateFromMessage(message: unknown): Promise<void> {
+  updateFromMessage(message: unknown): void {
     const parsed = DistanceTableMessageSchema.safeParse(message);
     if (!parsed.success) {
       throw new Error('Distance table message missing distances payload.');
     }
-    await this.updateDistances(parsed.data.data.distances);
+    this.updateDistances(parsed.data.data.distances);
   }
 
-  async updateDistances(
-    distances: Record<string, DistanceTableEntry>,
-  ): Promise<void> {
+  updateDistances(distances: Record<string, DistanceTableEntry>): void {
     this.distances = new Map(Object.entries(distances));
-    await this.persistDistances(distances);
+
+    // Cada vez que el broker nos mande distancias frescas,
+    // le pedimos al orquestador que despache el cálculo al microservicio
+    void this.routingOrchestrator.triggerRouteRecomputation();
   }
 
-  private async persistDistances(
-    distances: Record<string, DistanceTableEntry>,
-  ): Promise<void> {
-    const entries = Object.values(distances);
-    if (entries.length === 0) {
-      return;
+  updateComputedRoutes(routes: RoutingTables): void {
+    this.computedRoutes = routes;
+    console.log('Nuevas tablas de enrutamiento aplicadas exitosamente.');
+  }
+
+  getNextHop(
+    destinationId: string,
+    criteria: 'price' | 'distance',
+  ): string | null {
+    if (!this.computedRoutes) {
+      console.warn(
+        `getNextHop: Las tablas de enrutamiento aún no han sido calculadas.`,
+      );
+      return null;
     }
-    await this.prisma.$transaction(
-      entries.map((entry) =>
-        this.prisma.route.upsert({
-          where: { code: entry.destinationCode },
-          create: {
-            code: entry.destinationCode,
-            name: entry.destinationName,
-            enabled: entry.enabled,
-            distance: BigInt(Math.trunc(entry.distance)),
-            transportCost: BigInt(Math.trunc(entry.transportCost)),
-          },
-          update: {
-            name: entry.destinationName,
-            enabled: entry.enabled,
-            distance: BigInt(Math.trunc(entry.distance)),
-            transportCost: BigInt(Math.trunc(entry.transportCost)),
-          },
-        }),
-      ),
-    );
+
+    const tableToLook =
+      criteria === 'price'
+        ? this.computedRoutes.byPrice
+        : this.computedRoutes.byDistance;
+
+    const route = tableToLook[destinationId];
+
+    return route?.nextHop ?? null;
   }
 
   isDirectRouteAvailable(destinationId: string): boolean {

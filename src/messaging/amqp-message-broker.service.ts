@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access */
 import {
   Injectable,
   OnModuleInit,
@@ -20,7 +21,7 @@ export class AmqpMessageBrokerService
   implements MessageBrokerService, OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(AmqpMessageBrokerService.name);
-  private connection: amqp.ChannelModel | null = null;
+  private connection: any = null;
   private channel: amqp.Channel | null = null;
   private retryIndex = 0;
   private shutdownRequested = false;
@@ -49,12 +50,21 @@ export class AmqpMessageBrokerService
   private async connect(): Promise<void> {
     if (this.shutdownRequested) return;
     try {
-      const conn = await amqp.connect(this.url, {
-        servername: 'broker.iic2173.org',
-      });
+      // Infer TLS usage from URL scheme; only set servername for TLS connections
+      let connectOpts: amqp.Options.Connect | undefined = undefined;
+      try {
+        const u = new URL(this.url);
+        if (u.protocol === 'amqps:') {
+          connectOpts = { servername: u.hostname } as amqp.Options.Connect;
+        }
+      } catch {
+        // ignore invalid URL parsing and fall back to provided URL
+      }
+
+      const conn = (await amqp.connect(this.url, connectOpts)) as any;
       this.connection = conn;
       this.channel = await conn.createChannel();
-      await this.channel.prefetch(10);
+      if (this.channel) await this.channel.prefetch(10);
       this.retryIndex = 0;
       this.logger.log(
         `Connected. Queue=${this.queue} Exchange=${this.exchange}`,

@@ -18,9 +18,9 @@ describe('PackageService', () => {
     reportTransit: jest.Mock;
     reportTransitRedirect: jest.Mock;
   };
+  // --- ACTUALIZADO: Cambiamos las funciones antiguas por el nuevo método ---
   let distanceTable: {
-    isDirectRouteAvailable: jest.Mock;
-    pickRandomEnabledDestination: jest.Mock;
+    getNextHop: jest.Mock;
   };
   let packageEvents: { recordInbound: jest.Mock };
   let pending: {
@@ -66,9 +66,9 @@ describe('PackageService', () => {
       reportTransit: jest.fn(),
       reportTransitRedirect: jest.fn(),
     };
+    // --- ACTUALIZADO: Inicializamos el mock con getNextHop ---
     distanceTable = {
-      isDirectRouteAvailable: jest.fn(),
-      pickRandomEnabledDestination: jest.fn(),
+      getNextHop: jest.fn(),
     };
     packageEvents = {
       recordInbound: jest.fn().mockResolvedValue('created'),
@@ -165,7 +165,8 @@ describe('PackageService', () => {
   });
 
   it('routes directly when a direct route exists', async () => {
-    distanceTable.isDirectRouteAvailable.mockReturnValue(true);
+    // --- ACTUALIZADO: getNextHop devuelve la misma ciudad destino (Ruta directa) ---
+    distanceTable.getNextHop.mockReturnValue('HGW');
     const message = baseMessage({
       packageBody: {
         ...baseMessage().packageBody,
@@ -191,8 +192,8 @@ describe('PackageService', () => {
   });
 
   it('redirects when no direct route and a candidate exists', async () => {
-    distanceTable.isDirectRouteAvailable.mockReturnValue(false);
-    distanceTable.pickRandomEnabledDestination.mockReturnValue('MET');
+    // --- ACTUALIZADO: getNextHop devuelve una ciudad intermedia 'MET' (Redirección) ---
+    distanceTable.getNextHop.mockReturnValue('MET');
     const message = baseMessage({
       cityId: 'RNC',
       packageBody: {
@@ -204,11 +205,8 @@ describe('PackageService', () => {
 
     await service.handlePackageTransit(message, new Date());
 
-    const [excluded] = distanceTable.pickRandomEnabledDestination.mock
-      .calls[0] as [Set<string>];
-    expect(excluded instanceof Set).toBe(true);
-    expect(excluded.has('central')).toBe(true);
-    expect(excluded.has('RNC')).toBe(true);
+    // Se removió el chequeo de parámetros del método aleatorio antiguo ya que no se usa
+
     const redirectCall = broker.send.mock.calls.find(
       ([routingKey, payload]) =>
         routingKey === 'city.MET' &&
@@ -224,8 +222,8 @@ describe('PackageService', () => {
   });
 
   it('persists pending route when no routes are available', async () => {
-    distanceTable.isDirectRouteAvailable.mockReturnValue(false);
-    distanceTable.pickRandomEnabledDestination.mockReturnValue(null);
+    // --- ACTUALIZADO: getNextHop devuelve null (Sin ruta calculada aún) ---
+    distanceTable.getNextHop.mockReturnValue(null);
     const message = baseMessage();
 
     await service.handlePackageTransit(message, new Date());
@@ -317,11 +315,8 @@ describe('PackageService', () => {
       noRouteRecord,
     ]);
 
-    distanceTable.isDirectRouteAvailable
-      .mockReturnValueOnce(true)
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(false);
-    distanceTable.pickRandomEnabledDestination
+    distanceTable.getNextHop
+      .mockReturnValueOnce('HGW')
       .mockReturnValueOnce('RAP')
       .mockReturnValueOnce(null);
 

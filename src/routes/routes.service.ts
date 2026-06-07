@@ -1,36 +1,24 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@/prisma.service';
-import { CITY_CATALOG, getOwnCityId } from '@config/city.config';
-
-export interface RouteView {
-  code: string;
-  name: string;
-  enabled: boolean;
-}
+import { DistanceTableService } from '@/routing/distance-table.service';
 
 @Injectable()
 export class RoutesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly distanceTable: DistanceTableService) {}
 
-  async getRoutes(): Promise<{
-    cityId: string;
-    data: RouteView[];
+  getRoutes(): Array<{
+    code: string;
+    name: string;
+    distance: number;
+    transportCost: number;
+    enabled: boolean;
   }> {
-    const ownCity = getOwnCityId();
-    const stored = await this.prisma.route.findMany();
-    const byCode = new Map(stored.map((r) => [r.code, r]));
-
-    const data: RouteView[] = CITY_CATALOG.filter(
-      (c) => c.code !== ownCity,
-    ).map((city) => {
-      const row = byCode.get(city.code);
-      return {
-        code: city.code,
-        name: city.name,
-        enabled: row?.enabled ?? false,
-      };
-    });
-
-    return { cityId: ownCity, data };
+    const snapshot = this.distanceTable.getSnapshot();
+    return Object.values(snapshot).map((entry) => ({
+      code: entry.destinationCode,
+      name: entry.destinationName,
+      distance: entry.distance,
+      transportCost: entry.transportCost,
+      enabled: entry.enabled,
+    }));
   }
 }
