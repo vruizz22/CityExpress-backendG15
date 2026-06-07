@@ -36,6 +36,6 @@ import { RoutingSubscriberService } from '@/routing/routing-subscriber.service';
     },
     { provide: PackageDeliveryService, useClass: NoopPackageDeliveryService },
   ],
-  exports: [PackageService, DistanceTableService, AuditService],
+  exports: [PackageService, DistanceTableService, AuditService, MESSAGE_BROKER],
 })
 export class RoutingModule {}
