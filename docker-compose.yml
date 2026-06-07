@@ -28,6 +28,7 @@ services:
       - RABBITMQ_QUEUE=${RABBITMQ_QUEUE}
       - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
       - CITY_ID=${CITY_ID}
+      - USE_AMQP=true
     depends_on:
       - db
     networks:
@@ -47,6 +48,51 @@ services:
       - master
     networks:
       - quack-net
+
+  # --------------------------------------------------------
+  # NUEVO MICROSERVICIO DE JOBS (BULLMQ + DIJKSTRA)
+  # --------------------------------------------------------
+  redis-jobs:
+    image: redis:7-alpine
+    container_name: quackpackage_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - quack-net
+
+  job-master:
+    build:
+      context: ./jobs-service
+      dockerfile: Dockerfile
+    container_name: quackpackage_job_master
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - REDIS_HOST=redis-jobs
+      - REDIS_PORT=6379
+      - PORT=3001
+    depends_on:
+      - redis-jobs
+    networks:
+      - quack-net
+    command: npm run start:master # Sobrescribe el comando para correr el API
+
+  job-worker:
+    build:
+      context: ./jobs-service
+      dockerfile: Dockerfile
+    container_name: quackpackage_job_worker
+    restart: always
+    environment:
+      - REDIS_HOST=redis-jobs
+      - REDIS_PORT=6379
+    depends_on:
+      - redis-jobs
+    networks:
+      - quack-net
+    command: npm run start:worker # Sobrescribe el comando para correr el Worker
 
 volumes:
   pgdata:
