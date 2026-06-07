@@ -5,6 +5,11 @@
 > Backend NestJS · Postgres · RabbitMQ · AWS EC2 + ECR + API Gateway · Frontend Vite.js (repo separado)
 
 ---
+Links importantes:
+- Frontend: https://app.andresitowan.com
+- API pública: https://api.andresitowan.com
+- Origen directo (no accesible sin shared secrete): https://origin-api.andresitowan.com
+---
 
 ## Tabla de contenidos
 
@@ -68,6 +73,10 @@
 
 ## 2. Arquitectura
 
+UML Formal completo, imagen svg:
+
+![arquitectura](docs/arquitectura.svg)
+
 ```mermaid
 graph LR
     subgraph cloud[AWS Cloud]
@@ -102,7 +111,7 @@ graph LR
     CONN -.APM.-> NR
 ```
 
-> Detalle de NFRs priorizados, estilos arquitectónicos y diagramas UML formales en [`docs/architecture.md`](./docs/architecture.md). El UML formal `.drawio` (RDOC01) se completa en M3.
+> Detalle de NFRs priorizados, estilos arquitectónicos y diagramas UML formales en [`docs/architecture.md`](./docs/architecture.md).
 
 ---
 

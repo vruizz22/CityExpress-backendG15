@@ -32,7 +32,7 @@ export class RoutingOrchestratorService {
 
       // Creamos la conexión desde nuestra ciudad actual hacia el destino
       graph[CITY_ID][entry.destinationCode] = {
-        distance: entry.distance ?? 0, 
+        distance: entry.distance ?? 0,
         price: entry.transportCost ?? 0,
       };
     }
@@ -63,7 +63,7 @@ export class RoutingOrchestratorService {
       );
 
       // 4. Iniciar el Sondeo (Polling) para esperar a que el Worker termine en Redis
-      this.pollJobResult(rawData.jobId);
+      void this.pollJobResult(rawData.jobId);
     } catch (error) {
       this.logger.error(
         'Error al conectar con el microservicio de rutas:',

@@ -28,105 +28,120 @@ export class PackageService {
     private readonly deliveryService: PackageDeliveryService,
   ) {}
 
-  private async processFinalDestination(pkg: any, normalizedPayload: any, now: Date) {
-  await this.auditService.reportReceived(pkg.id);
-  
-  const deliverNotBefore = this.parseOptionalDate(pkg.deliverNotBefore);
-  if (deliverNotBefore && deliverNotBefore > now) {
-    await this.pendingRepository.savePendingDelivery(normalizedPayload);
-    return;
-  }
-  
-  await this.deliveryService.deliver(pkg);
-  await this.auditService.reportDelivered(pkg.id);
-}
+  private async processFinalDestination(
+    pkg: PackageBody,
+    normalizedPayload: PackageTransitMessage,
+    now: Date,
+  ) {
+    await this.auditService.reportReceived(pkg.id);
 
-private async processForwarding(pkg: any, normalizedPayload: any) {
-  if (pkg.maxHops <= 0) {
-    await this.auditService.reportExpired(pkg.id);
-    return;
+    const deliverNotBefore = this.parseOptionalDate(pkg.deliverNotBefore);
+    if (deliverNotBefore && deliverNotBefore > now) {
+      await this.pendingRepository.savePendingDelivery(normalizedPayload);
+      return;
+    }
+
+    await this.deliveryService.deliver(pkg);
+    await this.auditService.reportDelivered(pkg.id);
   }
 
-  const forwardedPackage = {
-    ...pkg,
-    maxHops: pkg.maxHops - 1,
-  };
+  private async processForwarding(
+    pkg: PackageBody,
+    normalizedPayload: PackageTransitMessage,
+  ) {
+    if (pkg.maxHops <= 0) {
+      await this.auditService.reportExpired(pkg.id);
+      return;
+    }
 
-  const constraints = pkg.constraints as Record<string, unknown> | undefined;
-  const criteria = constraints?.criteria === 'price' ? 'price' : 'distance';
+    const forwardedPackage = {
+      ...pkg,
+      maxHops: pkg.maxHops - 1,
+    };
 
-  const nextCityId = this.distanceTable.getNextHop(pkg.destinationId, criteria);
+    const constraints = pkg.constraints as Record<string, unknown> | undefined;
+    const criteria = constraints?.criteria === 'price' ? 'price' : 'distance';
 
-  if (!nextCityId) {
-    await this.pendingRepository.savePendingRoute(normalizedPayload);
-    return;
+    const nextCityId = this.distanceTable.getNextHop(
+      pkg.destinationId,
+      criteria,
+    );
+
+    if (!nextCityId) {
+      await this.pendingRepository.savePendingRoute(normalizedPayload);
+      return;
+    }
+
+    await this.sendPackage(nextCityId, forwardedPackage);
+
+    if (nextCityId === pkg.destinationId) {
+      await this.auditService.reportTransit(pkg.id, pkg.destinationId);
+    } else {
+      await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
+    }
   }
 
-  await this.sendPackage(nextCityId, forwardedPackage);
+  async handlePackageTransit(message: unknown, now: Date = new Date()) {
+    const envelope = MessageEnvelopeSchema.safeParse(message);
+    if (!envelope.success) {
+      throw new Error('Invalid message envelope.');
+    }
 
-  if (nextCityId === pkg.destinationId) {
-    await this.auditService.reportTransit(pkg.id, pkg.destinationId);
-  } else {
-    await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
-  }
-}
+    if (envelope.data.type !== 'package-transit') {
+      return;
+    }
 
-async handlePackageTransit(message: unknown, now: Date = new Date()) {
-  const envelope = MessageEnvelopeSchema.safeParse(message);
-  if (!envelope.success) {
-    throw new Error('Invalid message envelope.');
-  }
-  
-  if (envelope.data.type !== 'package-transit') {
-    return;
-  }
+    const parsed = PackageTransitMessageSchema.safeParse(message);
+    const senderCityId = envelope.data.cityId ?? null;
 
-  const parsed = PackageTransitMessageSchema.safeParse(message);
-  const senderCityId = envelope.data.cityId ?? null;
-  
-  if (!parsed.success) {
-    if (!senderCityId) {
+    if (!parsed.success) {
+      if (!senderCityId) {
+        throw new Error('Missing sender cityId for ACK/NACK.');
+      }
+      await this.sendAck(
+        senderCityId,
+        envelope.data.idpk,
+        envelope.data.msgId,
+        'nack',
+      );
+      return;
+    }
+
+    const payload = parsed.data;
+    const resolvedSenderCityId =
+      payload.cityId ?? payload.packageBody.originId ?? senderCityId;
+
+    if (!resolvedSenderCityId) {
       throw new Error('Missing sender cityId for ACK/NACK.');
     }
-    await this.sendAck(senderCityId, envelope.data.idpk, envelope.data.msgId, 'nack');
-    return;
+
+    const normalizedPayload: PackageTransitMessage = payload.cityId
+      ? payload
+      : { ...payload, cityId: resolvedSenderCityId };
+
+    const recordResult = await this.packageEvents.recordInbound(
+      normalizedPayload,
+      resolvedSenderCityId,
+    );
+
+    await this.sendAck(
+      resolvedSenderCityId,
+      normalizedPayload.idpk,
+      normalizedPayload.msgId,
+      'ack',
+    );
+
+    if (recordResult === 'duplicate') {
+      return;
+    }
+
+    const pkg = normalizedPayload.packageBody;
+    if (pkg.destinationId === CITY_ID) {
+      await this.processFinalDestination(pkg, normalizedPayload, now);
+    } else {
+      await this.processForwarding(pkg, normalizedPayload);
+    }
   }
-
-  const payload = parsed.data;
-  const resolvedSenderCityId = payload.cityId ?? payload.packageBody.originId ?? senderCityId;
-  
-  if (!resolvedSenderCityId) {
-    throw new Error('Missing sender cityId for ACK/NACK.');
-  }
-
-  const normalizedPayload = payload.cityId
-    ? payload
-    : { ...payload, cityId: resolvedSenderCityId };
-
-  const recordResult = await this.packageEvents.recordInbound(
-    normalizedPayload,
-    resolvedSenderCityId,
-  );
-  
-  await this.sendAck(
-    resolvedSenderCityId,
-    normalizedPayload.idpk,
-    normalizedPayload.msgId,
-    'ack',
-  );
-  
-  if (recordResult === 'duplicate') {
-    return;
-  }
-
-
-  const pkg = normalizedPayload.packageBody;
-  if (pkg.destinationId === CITY_ID) {
-    await this.processFinalDestination(pkg, normalizedPayload, now);
-  } else {
-    await this.processForwarding(pkg, normalizedPayload);
-  }
-}
 
   async processPendingDeliveries(now: Date = new Date()): Promise<void> {
     const pending =

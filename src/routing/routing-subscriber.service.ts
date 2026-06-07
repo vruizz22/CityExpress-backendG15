@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CITY_ID, cityRoutingKey } from '@/config/city.config';
 import {
   MESSAGE_BROKER,
@@ -10,6 +10,8 @@ import { PackageService } from '@/routing/package.service';
 
 @Injectable()
 export class RoutingSubscriberService implements OnModuleInit {
+  private readonly logger = new Logger(RoutingSubscriberService.name);
+
   constructor(
     @Inject(MESSAGE_BROKER) private readonly broker: MessageBrokerService,
     private readonly packageService: PackageService,
@@ -18,8 +20,12 @@ export class RoutingSubscriberService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.broker.subscribe(cityRoutingKey(CITY_ID), async (message) => {
+      this.logger.debug(`Incoming raw: ${JSON.stringify(message)}`);
       const envelope = MessageEnvelopeSchema.safeParse(message);
       if (!envelope.success) {
+        this.logger.warn(
+          `Envelope parse failed: ${JSON.stringify(envelope.error.issues)}`,
+        );
         return;
       }
 

@@ -8,6 +8,7 @@ import {
   MESSAGE_BROKER,
   MessageBrokerService,
 } from '@/messaging/message-broker.interface';
+import { AmqpMessageBrokerService } from '@/messaging/amqp-message-broker.service';
 import { createBaseMessage } from '@/messaging/message.factory';
 import { DistanceTableMessageSchema } from '@/messaging/message.schemas';
 import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
@@ -36,6 +37,9 @@ export class DistanceTableService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    if (this.broker instanceof AmqpMessageBrokerService) {
+      this.broker.onConnect(() => void this.requestInitialTable());
+    }
     await this.requestInitialTable();
   }
 
@@ -62,7 +66,7 @@ export class DistanceTableService implements OnModuleInit {
 
     // Cada vez que el broker nos mande distancias frescas,
     // le pedimos al orquestador que despache el cálculo al microservicio
-    this.routingOrchestrator.triggerRouteRecomputation();
+    void this.routingOrchestrator.triggerRouteRecomputation();
   }
 
   updateComputedRoutes(routes: RoutingTables): void {

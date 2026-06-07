@@ -315,7 +315,6 @@ describe('PackageService', () => {
       noRouteRecord,
     ]);
 
-    
     distanceTable.getNextHop
       .mockReturnValueOnce('HGW')
       .mockReturnValueOnce('RAP')

@@ -8,7 +8,7 @@ datasource db {
 }
 
 model PackageEvent {
-  idpk             String    @id @default(uuid())
+  idpk             String    @id
   type             String
   packageId        String
   deliveryStrategy String
@@ -23,4 +23,35 @@ model PackageEvent {
   priorityClass    String
   payment          Float
   senderCityId     String?
+  receivedAt       DateTime  @default(now())
+
+  @@index([packageId, receivedAt])
+  @@index([destinationId])
+}
+
+model Route {
+  code          String   @id
+  name          String
+  enabled       Boolean  @default(false)
+  distance      BigInt?
+  transportCost BigInt?
+  updatedAt     DateTime @updatedAt
+}
+
+model AuditEvent {
+  idpk      String   @id
+  packageId String
+  type      String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([packageId, createdAt])
+  @@index([type])
+}
+
+model User {
+  id        String   @id @default(uuid())
+  subject   String   @unique
+  email     String?
+  createdAt DateTime @default(now())
 }

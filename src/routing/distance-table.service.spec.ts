@@ -5,6 +5,7 @@ import {
   DistanceTableRequestMessage,
 } from '@/messaging/message.types';
 import { MessageBrokerService } from '@/messaging/message-broker.interface';
+import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
 
 describe('DistanceTableService', () => {
   const buildDistances = (): Record<string, DistanceTableEntry> => ({
@@ -31,8 +32,7 @@ describe('DistanceTableService', () => {
     };
     const mockRoutingOrchestrator = {
       triggerRouteRecomputation: jest.fn(),
-    } as any;
-
+    } as unknown as RoutingOrchestratorService;
 
     const service = new DistanceTableService(broker, mockRoutingOrchestrator);
 
@@ -54,8 +54,7 @@ describe('DistanceTableService', () => {
     };
     const mockRoutingOrchestrator = {
       triggerRouteRecomputation: jest.fn(),
-    } as any;
-
+    } as unknown as RoutingOrchestratorService;
 
     const service = new DistanceTableService(broker, mockRoutingOrchestrator);
     const message: DistanceTableMessage = {
@@ -79,8 +78,7 @@ describe('DistanceTableService', () => {
     };
     const mockRoutingOrchestrator = {
       triggerRouteRecomputation: jest.fn(),
-    } as any;
-
+    } as unknown as RoutingOrchestratorService;
 
     const service = new DistanceTableService(broker, mockRoutingOrchestrator);
     service.updateDistances(buildDistances());
@@ -99,8 +97,7 @@ describe('DistanceTableService', () => {
     };
     const mockRoutingOrchestrator = {
       triggerRouteRecomputation: jest.fn(),
-    } as any;
-
+    } as unknown as RoutingOrchestratorService;
 
     const service = new DistanceTableService(broker, mockRoutingOrchestrator);
     const message = {
