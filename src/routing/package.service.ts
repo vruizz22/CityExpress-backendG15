@@ -28,7 +28,7 @@ export class PackageService {
     private readonly packageEvents: PackageEventsRepository,
     private readonly pendingRepository: PendingPackagesRepository,
     private readonly deliveryService: PackageDeliveryService,
-  ) { }
+  ) {}
 
   async handlePackageTransit(message: unknown, now: Date = new Date()) {
     this.logger.debug(

@@ -30,8 +30,8 @@ importers:
         specifier: ^7.6.0
         version: 7.6.0
       amqplib:
-        specifier: ^2.0.1
-        version: 2.0.1
+        specifier: ^0.10.4
+        version: 0.10.9
       newrelic:
         specifier: ^13.19.2
         version: 13.19.2
@@ -64,7 +64,7 @@ importers:
         specifier: ^11.0.1
         version: 11.1.17(@nestjs/common@11.1.17(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.17)(@nestjs/platform-express@11.1.17)
       '@types/amqplib':
-        specifier: ^0.10.7
+        specifier: ^0.10.8
         version: 0.10.8
       '@types/express':
         specifier: ^5.0.0
@@ -1530,9 +1530,9 @@ packages:
   ajv@8.18.0:
     resolution: {integrity: sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A==}
 
-  amqplib@2.0.1:
-    resolution: {integrity: sha512-a3P2MgfCf9nzVis12VxWEn0dS6hcqve7dlEAhXDtIWR27BlhtMkILOc+H9aeHjDi6i6r94dYKc2Kx2OFe3avvg==}
-    engines: {node: '>=18'}
+  amqplib@0.10.9:
+    resolution: {integrity: sha512-jwSftI4QjS3mizvnSnOrPGYiUnm1vI2OP1iXeOUz5pb74Ua0nbf6nPyyTzuiCLEE3fMpaJORXh2K/TQ08H5xGA==}
+    engines: {node: '>=10'}
 
   ansi-colors@4.1.3:
     resolution: {integrity: sha512-/6w/C21Pm1A7aZitlI5Ni/2J6FFQN8i1Cvz3kHABAAbw93v/NlvKdVOqz7CCWz/3iv/JplRSEEZ83XION15ovw==}
@@ -5591,7 +5591,10 @@ snapshots:
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
-  amqplib@2.0.1: {}
+  amqplib@0.10.9:
+    dependencies:
+      buffer-more-ints: 1.0.0
+      url-parse: 1.5.10
 
   ansi-colors@4.1.3: {}
 
