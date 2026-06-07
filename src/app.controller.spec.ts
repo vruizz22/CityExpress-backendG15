@@ -16,7 +16,9 @@ describe('AppController', () => {
 
   describe('root', () => {
     it('should return the welcome banner', () => {
-      expect(appController.getHello()).toBe('QuackPackage API Running!');
+      expect(appController.getHello()).toBe(
+        'CityExpress G15 (TK3) API Running!',
+      );
     });
   });
 });

@@ -26,6 +26,7 @@ RUN pnpm install --prod --frozen-lockfile
 
 COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/prisma ./prisma
+COPY --from=builder /usr/src/app/prisma.config.ts ./
 
 RUN pnpx prisma generate
 

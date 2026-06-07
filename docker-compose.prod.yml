@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: cityexpress_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - cityexpress-net
+    # Sin "ports": la DB no se expone al host
+
+  master:
+    image: ${ECR_REGISTRY}/cityexpress-master:${IMAGE_TAG}
+    container_name: cityexpress_master
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      - NODE_ENV=production
+      - NODE_OPTIONS=-r newrelic
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NEW_RELIC_APP_NAME=cityexpress-master
+      - NEW_RELIC_NO_CONFIG_FILE=true
+      - RABBITMQ_URL=${RABBITMQ_URL}
+      - RABBITMQ_QUEUE=${RABBITMQ_QUEUE}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
+      - CITY_ID=${CITY_ID}
+    depends_on:
+      - db
+    ports:
+      - "127.0.0.1:3000:3000"   # solo loopback; NGINX lo proxiea
+    networks:
+      - cityexpress-net
+
+  # connector E0 deshabilitado en E1: el master NestJS maneja el broker AMQP directamente
+  # connector:
+  #   image: ${ECR_REGISTRY}/cityexpress-connector:${IMAGE_TAG}
+
+volumes:
+  pgdata:
+
+networks:
+  cityexpress-net:
+    driver: bridge

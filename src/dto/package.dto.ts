@@ -36,3 +36,19 @@ export const GetPackagesQuerySchema = z.object({
 });
 
 export type GetPackagesQuery = z.infer<typeof GetPackagesQuerySchema>;
+
+export interface PackageView {
+  id: string;
+  originId: string;
+  destinationId: string;
+  maxHops: number;
+  createdAt: Date;
+  deliverNotBefore: Date | null;
+  lastAction: string | null;
+  receivedAt: Date;
+  canDeliver: boolean;
+}
+
+export interface DeliverPackageBody {
+  idpk?: string;
+}
