@@ -28,6 +28,7 @@ services:
       - RABBITMQ_QUEUE=${RABBITMQ_QUEUE}
       - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
       - CITY_ID=${CITY_ID}
+      - USE_AMQP=true
     depends_on:
       - db
     networks:
