@@ -94,7 +94,7 @@ No reconstruyas: adopta el `jobs-service/` del PR #21. Tu trabajo:
    - ✅ Env `JOB_MASTER_URL` (ya en `docker-compose.yml` dev → `http://job-master:3001`). Falta su valor en prod al desplegar el jobs-service (RNF06/RNF08).
    - ⏳ **Deploy:** agregar la ruta `/heartbeat` (auth NONE) en API Gateway (ver [docs/deploy.md §10](docs/deploy.md)) para que el front la alcance vía `api.andresitowan.com/heartbeat`.
 2. **Persistir resultados (RNF07):** cuando el orquestador recibe el resultado, además de `updateComputedRoutes` en memoria, persistir en `CalculatedRoute` (coordinar con Andre). Así sobrevive reinicios y sirve a la cotización.
-3. **Idempotencia / anti-spam:** el recálculo se dispara en **cada** `updateDistances`. Agrega debounce (p.ej. no relanzar si hay un job en vuelo o si pasó <N s) para no saturar (ojo con la política de "abuso de mensajería" del enunciado).
+3. ✅ **Idempotencia / anti-spam (HECHO, 2026-06-07):** el `DistanceTableService` ahora llama `routingOrchestrator.scheduleRouteRecomputation()` (debounce de `ROUTE_RECOMPUTE_DEBOUNCE_MS`, default 3000ms) en vez de disparar directo. Agrupa ráfagas de `cost-update` en un solo recálculo + guard de "uno a la vez" (si ya corre uno, marca rerun trailing en vez de solapar). Con tests (`routing-orchestrator.service.spec.ts`).
 4. **Robustez (RNF03):** ya hay retries en BullMQ (`attempts:3`, backoff) y polling con límite. Verifica que `FAILED` se propague y que el backend no quede colgado.
 5. **Redis en la nube:** BullMQ necesita Redis. En EC2 va como contenedor (`restart: unless-stopped`). Ojo RAM en la t3.micro (ver §4.2 y respuesta de "2 cuentas").
 

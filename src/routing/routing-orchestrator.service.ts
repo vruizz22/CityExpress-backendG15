@@ -11,6 +11,51 @@ export class RoutingOrchestratorService {
 
   constructor(private readonly distanceTable: DistanceTableService) {}
 
+  // --- Debounce / anti-spam del recálculo (RNF01 / RNF03) ---
+  // Agrupa ráfagas de cost-update en un solo recálculo y evita solapar jobs.
+  private readonly debounceMs = Number(
+    process.env.ROUTE_RECOMPUTE_DEBOUNCE_MS ?? 3000,
+  );
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private recomputing = false;
+  private rerunRequested = false;
+
+  /**
+   * Punto de entrada con debounce. Llamar ESTE (no `triggerRouteRecomputation`)
+   * desde el flujo de mensajes: si llegan varias tablas seguidas, se agrupan en
+   * un único recálculo cuando la ráfaga se calma (`debounceMs`).
+   */
+  scheduleRouteRecomputation(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = null;
+      void this.runRecomputation();
+    }, this.debounceMs);
+  }
+
+  /**
+   * Ejecuta el recálculo con guard de "uno a la vez": si ya hay uno en curso,
+   * marca que debe repetirse al terminar (trailing) en vez de solapar jobs.
+   */
+  private async runRecomputation(): Promise<void> {
+    if (this.recomputing) {
+      this.rerunRequested = true;
+      return;
+    }
+    this.recomputing = true;
+    try {
+      await this.triggerRouteRecomputation();
+    } finally {
+      this.recomputing = false;
+      if (this.rerunRequested) {
+        this.rerunRequested = false;
+        this.scheduleRouteRecomputation();
+      }
+    }
+  }
+
   async triggerRouteRecomputation(): Promise<void> {
     this.logger.log('Iniciando proceso de recalculo de rutas óptimas...');
 

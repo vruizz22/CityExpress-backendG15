@@ -32,6 +32,7 @@ describe('DistanceTableService', () => {
     };
     const mockRoutingOrchestrator = {
       triggerRouteRecomputation: jest.fn(),
+      scheduleRouteRecomputation: jest.fn(),
     } as unknown as RoutingOrchestratorService;
 
     const service = new DistanceTableService(broker, mockRoutingOrchestrator);
@@ -54,6 +55,7 @@ describe('DistanceTableService', () => {
     };
     const mockRoutingOrchestrator = {
       triggerRouteRecomputation: jest.fn(),
+      scheduleRouteRecomputation: jest.fn(),
     } as unknown as RoutingOrchestratorService;
 
     const service = new DistanceTableService(broker, mockRoutingOrchestrator);
@@ -78,6 +80,7 @@ describe('DistanceTableService', () => {
     };
     const mockRoutingOrchestrator = {
       triggerRouteRecomputation: jest.fn(),
+      scheduleRouteRecomputation: jest.fn(),
     } as unknown as RoutingOrchestratorService;
 
     const service = new DistanceTableService(broker, mockRoutingOrchestrator);
@@ -97,6 +100,7 @@ describe('DistanceTableService', () => {
     };
     const mockRoutingOrchestrator = {
       triggerRouteRecomputation: jest.fn(),
+      scheduleRouteRecomputation: jest.fn(),
     } as unknown as RoutingOrchestratorService;
 
     const service = new DistanceTableService(broker, mockRoutingOrchestrator);
