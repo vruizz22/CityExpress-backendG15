@@ -2,6 +2,7 @@ FROM node:20-alpine AS builder
 
 # Habilitar corepack para poder usar la versión de pnpm correcta
 RUN corepack enable pnpm
+RUN corepack prepare pnpm@10.11.1 --activate
 
 WORKDIR /usr/src/app
 
@@ -18,6 +19,7 @@ FROM node:20-alpine
 WORKDIR /usr/src/app
 
 RUN corepack enable pnpm
+RUN corepack prepare pnpm@10.11.1 --activate
 COPY package.json pnpm-lock.yaml ./
 
 RUN pnpm install --prod --frozen-lockfile
