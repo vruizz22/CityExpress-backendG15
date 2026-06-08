@@ -13,4 +13,7 @@ USER node
 
 EXPOSE 3001
 
-CMD ["npm", "run", "start"]
+# Por defecto corre el master (job-master). El job-worker sobreescribe el command
+# a ["node","dist/worker.js"] en el compose. (Antes era `npm run start`, script
+# inexistente → el contenedor crasheaba.)
+CMD ["node", "dist/master.js"]

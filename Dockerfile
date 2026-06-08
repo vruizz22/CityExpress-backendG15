@@ -30,5 +30,8 @@ RUN pnpx prisma generate
 
 EXPOSE 3000
 
-# Usamos pnpx para ejecutar prisma deploy con pnpm
-CMD ["sh", "-c", "pnpx prisma migrate deploy && pnpm run start:prod"]
+# Migraciones al arrancar. `NODE_OPTIONS=` solo en el migrate: si no, el
+# `-r newrelic` del contenedor se cuela al preinstall de prisma (contexto dlx
+# sin newrelic) y crashea el arranque en loop. La app (start:prod) sí conserva
+# NODE_OPTIONS=-r newrelic del entorno del contenedor.
+CMD ["sh", "-c", "NODE_OPTIONS= pnpx prisma migrate deploy && pnpm run start:prod"]
