@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { RoutesService } from '@routes/routes.service';
+import { RoutesService } from './routes.service';
 
 @Controller('routes')
 export class RoutesController {
@@ -7,6 +7,7 @@ export class RoutesController {
 
   @Get()
   getRoutes() {
-    return this.routesService.getRoutes();
+    const data = this.routesService.getRoutes();
+    return { data };
   }
 }

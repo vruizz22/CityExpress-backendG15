@@ -1,8 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-return,@typescript-eslint/no-unsafe-call */
 import { Module } from '@nestjs/common';
 import { PrismaService } from '@/prisma.service';
 import { MESSAGE_BROKER } from '@/messaging/message-broker.interface';
 import { NoopMessageBrokerService } from '@/messaging/noop-message-broker.service';
-import { AmqpMessageBrokerService } from '@/messaging/amqp-message-broker.service';
 import { AuditService } from '@/routing/audit.service';
 import { DistanceTableService } from '@/routing/distance-table.service';
 import { PackageEventsRepository } from '@/routing/package-events.repository';
@@ -13,13 +13,7 @@ import {
   PackageDeliveryService,
 } from '@/routing/package-delivery.service';
 import { RoutingSubscriberService } from '@/routing/routing-subscriber.service';
-
-const brokerProvider = {
-  provide: MESSAGE_BROKER,
-  useClass: process.env.RABBITMQ_URL
-    ? AmqpMessageBrokerService
-    : NoopMessageBrokerService,
-};
+import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
 
 @Module({
   providers: [
@@ -30,9 +24,20 @@ const brokerProvider = {
     PendingPackagesRepository,
     PackageService,
     RoutingSubscriberService,
-    brokerProvider,
+    RoutingOrchestratorService,
+    {
+      provide: MESSAGE_BROKER,
+      useFactory: async () => {
+        if (process.env.USE_AMQP === 'true') {
+          const mod = await import('../messaging/amqp-message-broker.service');
+          const { AmqpMessageBrokerService } = mod as any;
+          return new AmqpMessageBrokerService();
+        }
+        return new NoopMessageBrokerService();
+      },
+    },
     { provide: PackageDeliveryService, useClass: NoopPackageDeliveryService },
   ],
-  exports: [PackageService, DistanceTableService, AuditService],
+  exports: [PackageService, DistanceTableService, AuditService, MESSAGE_BROKER],
 })
 export class RoutingModule {}

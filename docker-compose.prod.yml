@@ -28,10 +28,58 @@ services:
       - RABBITMQ_QUEUE=${RABBITMQ_QUEUE}
       - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
       - CITY_ID=${CITY_ID}
+      - USE_AMQP=true
+      - JOB_MASTER_URL=http://job-master:3001
+      - AUTH0_ISSUER=${AUTH0_ISSUER:-https://frontendg15cityexpress.us.auth0.com/}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-https://api.andresitowan.com}
+      - AUTH0_ROLES_CLAIM=${AUTH0_ROLES_CLAIM:-https://cityexpress/roles}
     depends_on:
       - db
+      - job-master
     ports:
       - "127.0.0.1:3000:3000"   # solo loopback; NGINX lo proxiea
+    networks:
+      - cityexpress-net
+
+  # RNF01/RNF06: servicio de jobs (cola BullMQ sobre Redis). El worker invoca la
+  # Lambda (RNF06). Imagen propia en ECR (cityexpress-jobs), una sola para master
+  # y worker (el worker sobreescribe el command).
+  redis-jobs:
+    image: redis:7-alpine
+    container_name: cityexpress_redis_jobs
+    restart: unless-stopped
+    networks:
+      - cityexpress-net
+    # Sin "ports": solo accesible dentro de la red de Docker
+
+  job-master:
+    image: ${ECR_REGISTRY}/cityexpress-jobs:${IMAGE_TAG}
+    container_name: cityexpress_job_master
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis-jobs
+      - REDIS_PORT=6379
+      - PORT=3001
+    depends_on:
+      - redis-jobs
+    networks:
+      - cityexpress-net
+    # Sin "ports": el master NestJS lo alcanza por JOB_MASTER_URL=http://job-master:3001
+
+  job-worker:
+    image: ${ECR_REGISTRY}/cityexpress-jobs:${IMAGE_TAG}
+    container_name: cityexpress_job_worker
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    environment:
+      - REDIS_HOST=redis-jobs
+      - REDIS_PORT=6379
+      # RNF06: el worker invoca la Lambda. Las credenciales salen del instance
+      # profile de la EC2 → necesita lambda:InvokeFunction sobre esta función.
+      - WORKER_LAMBDA_NAME=cityexpress-jobs-worker-prod-compute
+      - AWS_REGION=us-east-1
+    depends_on:
+      - redis-jobs
     networks:
       - cityexpress-net
 

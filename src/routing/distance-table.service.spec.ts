@@ -5,7 +5,7 @@ import {
   DistanceTableRequestMessage,
 } from '@/messaging/message.types';
 import { MessageBrokerService } from '@/messaging/message-broker.interface';
-import { PrismaService } from '@/prisma.service';
+import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
 
 describe('DistanceTableService', () => {
   const buildDistances = (): Record<string, DistanceTableEntry> => ({
@@ -25,18 +25,17 @@ describe('DistanceTableService', () => {
     },
   });
 
-  const buildPrismaMock = () =>
-    ({
-      route: { upsert: jest.fn().mockResolvedValue(undefined) },
-      $transaction: jest.fn(async (ops: unknown[]) => Promise.all(ops)),
-    }) as unknown as PrismaService;
-
   it('requests the initial distance table from central', async () => {
     const broker: MessageBrokerService = {
       send: jest.fn(),
       subscribe: jest.fn(),
     };
-    const service = new DistanceTableService(broker, buildPrismaMock());
+    const mockRoutingOrchestrator = {
+      triggerRouteRecomputation: jest.fn(),
+      scheduleRouteRecomputation: jest.fn(),
+    } as unknown as RoutingOrchestratorService;
+
+    const service = new DistanceTableService(broker, mockRoutingOrchestrator);
 
     await service.requestInitialTable();
 
@@ -49,13 +48,17 @@ describe('DistanceTableService', () => {
     expect(payload.data.ask).toBe('distance-table');
   });
 
-  it('updates and queries direct routes', async () => {
+  it('updates and queries direct routes', () => {
     const broker: MessageBrokerService = {
       send: jest.fn(),
       subscribe: jest.fn(),
     };
-    const prisma = buildPrismaMock();
-    const service = new DistanceTableService(broker, prisma);
+    const mockRoutingOrchestrator = {
+      triggerRouteRecomputation: jest.fn(),
+      scheduleRouteRecomputation: jest.fn(),
+    } as unknown as RoutingOrchestratorService;
+
+    const service = new DistanceTableService(broker, mockRoutingOrchestrator);
     const message: DistanceTableMessage = {
       idpk: 'idpk-1',
       msgId: 'msg-1',
@@ -64,46 +67,24 @@ describe('DistanceTableService', () => {
       data: { distances: buildDistances() },
     };
 
-    await service.updateFromMessage(message);
+    service.updateFromMessage(message);
 
     expect(service.isDirectRouteAvailable('HGW')).toBe(true);
     expect(service.isDirectRouteAvailable('TK3')).toBe(false);
-    expect((prisma.route.upsert as jest.Mock).mock.calls).toHaveLength(2);
-    const upsertCalls = (prisma.route.upsert as jest.Mock).mock.calls as Array<
-      [
-        {
-          where: { code: string };
-          create: {
-            code: string;
-            name: string;
-            enabled: boolean;
-            distance: bigint;
-            transportCost: bigint;
-          };
-          update: {
-            name: string;
-            enabled: boolean;
-            distance: bigint;
-            transportCost: bigint;
-          };
-        },
-      ]
-    >;
-    const hgwCall = upsertCalls.find(([arg]) => arg.where.code === 'HGW');
-    expect(hgwCall).toBeDefined();
-    expect(hgwCall![0].create.enabled).toBe(true);
-    expect(hgwCall![0].create.distance).toBe(BigInt(100));
-    expect(hgwCall![0].create.transportCost).toBe(BigInt(10));
-    expect(hgwCall![0].update.enabled).toBe(true);
   });
 
-  it('selects a random enabled destination excluding blocked cities', async () => {
+  it('selects a random enabled destination excluding blocked cities', () => {
     const broker: MessageBrokerService = {
       send: jest.fn(),
       subscribe: jest.fn(),
     };
-    const service = new DistanceTableService(broker, buildPrismaMock());
-    await service.updateDistances(buildDistances());
+    const mockRoutingOrchestrator = {
+      triggerRouteRecomputation: jest.fn(),
+      scheduleRouteRecomputation: jest.fn(),
+    } as unknown as RoutingOrchestratorService;
+
+    const service = new DistanceTableService(broker, mockRoutingOrchestrator);
+    service.updateDistances(buildDistances());
 
     const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
     const pick = service.pickRandomEnabledDestination(new Set(['TK3']));
@@ -112,12 +93,17 @@ describe('DistanceTableService', () => {
     expect(pick).toBe('HGW');
   });
 
-  it('throws when distance-table payload is missing', async () => {
+  it('throws when distance-table payload is missing', () => {
     const broker: MessageBrokerService = {
       send: jest.fn(),
       subscribe: jest.fn(),
     };
-    const service = new DistanceTableService(broker, buildPrismaMock());
+    const mockRoutingOrchestrator = {
+      triggerRouteRecomputation: jest.fn(),
+      scheduleRouteRecomputation: jest.fn(),
+    } as unknown as RoutingOrchestratorService;
+
+    const service = new DistanceTableService(broker, mockRoutingOrchestrator);
     const message = {
       idpk: 'idpk-1',
       msgId: 'msg-1',
@@ -126,7 +112,7 @@ describe('DistanceTableService', () => {
       data: {},
     } as DistanceTableMessage;
 
-    await expect(service.updateFromMessage(message)).rejects.toThrow(
+    expect(() => service.updateFromMessage(message)).toThrow(
       'Distance table message missing distances payload.',
     );
   });

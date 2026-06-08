@@ -1,0 +1,21 @@
+{
+  "sourceNode": "TK3",
+  "graph": {
+    "TK3": [
+      { "code": "COR", "distance": 100, "transportCost": 500, "enabled": true },
+      { "code": "HGW", "distance": 800, "transportCost": 100, "enabled": true }
+    ],
+    "COR": [
+      { "code": "TK3", "distance": 100, "transportCost": 500, "enabled": true },
+      { "code": "TAR", "distance": 300, "transportCost": 200, "enabled": true }
+    ],
+    "HGW": [
+      { "code": "TK3", "distance": 800, "transportCost": 100, "enabled": true },
+      { "code": "TAR", "distance": 50, "transportCost": 1000, "enabled": true }
+    ],
+    "TAR": [
+      { "code": "COR", "distance": 300, "transportCost": 200, "enabled": true },
+      { "code": "HGW", "distance": 50, "transportCost": 1000, "enabled": true }
+    ]
+  }
+}

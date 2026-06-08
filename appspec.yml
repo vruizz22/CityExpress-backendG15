@@ -1,0 +1,21 @@
+version: 0.0
+os: linux
+
+# Copia el compose y el tag de imagen a /opt/cityexpress. El .env de prod (con
+# los secretos) ya vive en la EC2 y NO se toca aquí. Se usa OVERWRITE en el
+# create-deployment para reemplazar el compose puesto a mano en E1.
+files:
+  - source: docker-compose.prod.yml
+    destination: /opt/cityexpress
+  - source: image_tag
+    destination: /opt/cityexpress
+
+hooks:
+  AfterInstall:
+    - location: deploy/pull_and_up.sh
+      timeout: 300
+      runas: root
+  ValidateService:
+    - location: deploy/healthcheck.sh
+      timeout: 180
+      runas: root

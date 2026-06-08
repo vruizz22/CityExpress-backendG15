@@ -1,5 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { CITY_ID, CENTRAL_ID, cityRoutingKey } from '@/config/city.config';
+import { Inject, Injectable } from '@nestjs/common';
+import { CITY_ID, cityRoutingKey } from '@/config/city.config';
 import {
   MESSAGE_BROKER,
   MessageBrokerService,
@@ -19,8 +19,6 @@ import { PackageBody } from '@dto/package.dto';
 
 @Injectable()
 export class PackageService {
-  private readonly logger = new Logger(PackageService.name);
-
   constructor(
     @Inject(MESSAGE_BROKER) private readonly broker: MessageBrokerService,
     private readonly auditService: AuditService,
@@ -28,29 +26,75 @@ export class PackageService {
     private readonly packageEvents: PackageEventsRepository,
     private readonly pendingRepository: PendingPackagesRepository,
     private readonly deliveryService: PackageDeliveryService,
-  ) { }
+  ) {}
+
+  private async processFinalDestination(
+    pkg: PackageBody,
+    normalizedPayload: PackageTransitMessage,
+    now: Date,
+  ) {
+    await this.auditService.reportReceived(pkg.id);
+
+    const deliverNotBefore = this.parseOptionalDate(pkg.deliverNotBefore);
+    if (deliverNotBefore && deliverNotBefore > now) {
+      await this.pendingRepository.savePendingDelivery(normalizedPayload);
+      return;
+    }
+
+    await this.deliveryService.deliver(pkg);
+    await this.auditService.reportDelivered(pkg.id);
+  }
+
+  private async processForwarding(
+    pkg: PackageBody,
+    normalizedPayload: PackageTransitMessage,
+  ) {
+    if (pkg.maxHops <= 0) {
+      await this.auditService.reportExpired(pkg.id);
+      return;
+    }
+
+    const forwardedPackage = {
+      ...pkg,
+      maxHops: pkg.maxHops - 1,
+    };
+
+    const constraints = pkg.constraints as Record<string, unknown> | undefined;
+    const criteria = constraints?.criteria === 'price' ? 'price' : 'distance';
+
+    const nextCityId = this.distanceTable.getNextHop(
+      pkg.destinationId,
+      criteria,
+    );
+
+    if (!nextCityId) {
+      await this.pendingRepository.savePendingRoute(normalizedPayload);
+      return;
+    }
+
+    await this.sendPackage(nextCityId, forwardedPackage);
+
+    if (nextCityId === pkg.destinationId) {
+      await this.auditService.reportTransit(pkg.id, pkg.destinationId);
+    } else {
+      await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
+    }
+  }
 
   async handlePackageTransit(message: unknown, now: Date = new Date()) {
-    this.logger.debug(
-      `Incoming package-transit raw: ${JSON.stringify(message)}`,
-    );
     const envelope = MessageEnvelopeSchema.safeParse(message);
     if (!envelope.success) {
-      this.logger.error(
-        `Envelope parse failed: ${JSON.stringify(envelope.error.issues)} | raw=${JSON.stringify(message)}`,
-      );
       throw new Error('Invalid message envelope.');
     }
+
     if (envelope.data.type !== 'package-transit') {
       return;
     }
 
     const parsed = PackageTransitMessageSchema.safeParse(message);
     const senderCityId = envelope.data.cityId ?? null;
+
     if (!parsed.success) {
-      this.logger.error(
-        `PackageTransit parse failed: ${JSON.stringify(parsed.error.issues)} | raw=${JSON.stringify(message)}`,
-      );
       if (!senderCityId) {
         throw new Error('Missing sender cityId for ACK/NACK.');
       }
@@ -66,6 +110,7 @@ export class PackageService {
     const payload = parsed.data;
     const resolvedSenderCityId =
       payload.cityId ?? payload.packageBody.originId ?? senderCityId;
+
     if (!resolvedSenderCityId) {
       throw new Error('Missing sender cityId for ACK/NACK.');
     }
@@ -78,55 +123,24 @@ export class PackageService {
       normalizedPayload,
       resolvedSenderCityId,
     );
+
     await this.sendAck(
       resolvedSenderCityId,
       normalizedPayload.idpk,
       normalizedPayload.msgId,
       'ack',
     );
+
     if (recordResult === 'duplicate') {
       return;
     }
 
     const pkg = normalizedPayload.packageBody;
-    if (pkg.destinationId.toUpperCase() === CITY_ID.toUpperCase()) {
-      await this.auditService.reportReceived(pkg.id);
-      const deliverNotBefore = this.parseOptionalDate(pkg.deliverNotBefore);
-      if (deliverNotBefore && deliverNotBefore > now) {
-        await this.pendingRepository.savePendingDelivery(normalizedPayload);
-        return;
-      }
-      await this.deliveryService.deliver(pkg);
-      await this.auditService.reportDelivered(pkg.id);
-      return;
+    if (pkg.destinationId === CITY_ID) {
+      await this.processFinalDestination(pkg, normalizedPayload, now);
+    } else {
+      await this.processForwarding(pkg, normalizedPayload);
     }
-
-    if (pkg.maxHops <= 0) {
-      await this.auditService.reportExpired(pkg.id);
-      return;
-    }
-
-    const forwardedPackage = {
-      ...pkg,
-      maxHops: pkg.maxHops - 1,
-    };
-
-    if (this.distanceTable.isDirectRouteAvailable(pkg.destinationId)) {
-      await this.sendPackage(pkg.destinationId, forwardedPackage);
-      await this.auditService.reportTransit(pkg.id, pkg.destinationId);
-      return;
-    }
-
-    const excluded = new Set<string>([CENTRAL_ID, resolvedSenderCityId]);
-    const nextCityId =
-      this.distanceTable.pickRandomEnabledDestination(excluded);
-    if (!nextCityId) {
-      await this.pendingRepository.savePendingRoute(normalizedPayload);
-      return;
-    }
-
-    await this.sendPackage(nextCityId, forwardedPackage);
-    await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
   }
 
   async processPendingDeliveries(now: Date = new Date()): Promise<void> {
@@ -154,26 +168,30 @@ export class PackageService {
       }
 
       const forwardedPackage = { ...pkg, maxHops: pkg.maxHops - 1 };
-      if (this.distanceTable.isDirectRouteAvailable(pkg.destinationId)) {
-        await this.sendPackage(pkg.destinationId, forwardedPackage);
-        await this.auditService.reportTransit(pkg.id, pkg.destinationId);
-        await this.pendingRepository.removePending(record.idpk);
-        continue;
-      }
 
-      const senderCityId: string = record.senderCityId ?? pkg.originId;
-      if (!senderCityId) {
-        throw new Error('Missing sender cityId for pending route.');
-      }
-      const excluded = new Set<string>([CENTRAL_ID, senderCityId]);
-      const nextCityId =
-        this.distanceTable.pickRandomEnabledDestination(excluded);
+      // --- NUEVA LÓGICA DE RUTEO POR CRITERIO (Para paquetes pendientes) ---
+      const constraints = pkg.constraints as
+        | Record<string, unknown>
+        | undefined;
+      const criteria = constraints?.criteria === 'price' ? 'price' : 'distance';
+
+      const nextCityId = this.distanceTable.getNextHop(
+        pkg.destinationId,
+        criteria,
+      );
+
       if (!nextCityId) {
-        continue;
+        continue; // Sigue pendiente si aún no hay ruta
       }
 
       await this.sendPackage(nextCityId, forwardedPackage);
-      await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
+
+      if (nextCityId === pkg.destinationId) {
+        await this.auditService.reportTransit(pkg.id, pkg.destinationId);
+      } else {
+        await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
+      }
+
       await this.pendingRepository.removePending(record.idpk);
     }
   }
