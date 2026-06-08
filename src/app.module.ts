@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { PackagesModule } from '@packages/packages.module';
 import { RoutingModule } from '@/routing/routing.module';
 import { RoutesModule } from '@/routes/routes.module';
+import { JobsModule } from '@/jobs/jobs.module';
 import { AuthModule } from '@/auth/auth.module';
 import { RoutingCalcModule } from '@/routing-calc/routing-calc.module';
 import { ShipmentsModule } from '@/shipments/shipments.module';
@@ -15,6 +16,7 @@ import { DevSeedModule } from '@/dev/dev-seed.module';
     PackagesModule,
     RoutingModule,
     RoutesModule,
+    JobsModule,
     AuthModule,
     RoutingCalcModule,
     ShipmentsModule,

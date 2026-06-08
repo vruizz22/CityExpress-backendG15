@@ -65,9 +65,9 @@ export class DistanceTableService implements OnModuleInit {
   updateDistances(distances: Record<string, DistanceTableEntry>): void {
     this.distances = new Map(Object.entries(distances));
 
-    // Cada vez que el broker nos mande distancias frescas,
-    // le pedimos al orquestador que despache el cálculo al microservicio
-    void this.routingOrchestrator.triggerRouteRecomputation();
+    // Cada vez que el broker nos mande distancias frescas, agendamos el cálculo
+    // con debounce (agrupa ráfagas de cost-update en un solo recálculo).
+    this.routingOrchestrator.scheduleRouteRecomputation();
   }
 
   updateComputedRoutes(routes: RoutingTables): void {

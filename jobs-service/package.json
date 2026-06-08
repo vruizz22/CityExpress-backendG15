@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
+    "deploy": "serverless deploy",
     "start:master": "ts-node src/master.ts",
     "start:worker": "ts-node src/worker.ts",
     "dev:master": "nodemon src/master.ts",
@@ -15,6 +16,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-lambda": "^3.1063.0",
     "bullmq": "^5.78.0",
     "express": "^5.2.1",
     "ioredis": "^5.11.1",
@@ -23,7 +25,10 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^25.9.2",
+    "esbuild": "^0.28.0",
     "nodemon": "^3.1.14",
+    "serverless": "^3.40.0",
+    "serverless-esbuild": "^1.57.2",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
   }

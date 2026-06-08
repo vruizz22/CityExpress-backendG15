@@ -14,31 +14,81 @@ export class RoutingOrchestratorService {
     private readonly distanceTable: DistanceTableService,
   ) {}
 
+  // --- Debounce / anti-spam del recálculo (RNF01 / RNF03) ---
+  // Agrupa ráfagas de cost-update en un solo recálculo y evita solapar jobs.
+  private readonly debounceMs = Number(
+    process.env.ROUTE_RECOMPUTE_DEBOUNCE_MS ?? 3000,
+  );
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private recomputing = false;
+  private rerunRequested = false;
+
+  /**
+   * Punto de entrada con debounce. Llamar ESTE (no `triggerRouteRecomputation`)
+   * desde el flujo de mensajes: si llegan varias tablas seguidas, se agrupan en
+   * un único recálculo cuando la ráfaga se calma (`debounceMs`).
+   */
+  scheduleRouteRecomputation(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = null;
+      void this.runRecomputation();
+    }, this.debounceMs);
+  }
+
+  /**
+   * Ejecuta el recálculo con guard de "uno a la vez": si ya hay uno en curso,
+   * marca que debe repetirse al terminar (trailing) en vez de solapar jobs.
+   */
+  private async runRecomputation(): Promise<void> {
+    if (this.recomputing) {
+      this.rerunRequested = true;
+      return;
+    }
+    this.recomputing = true;
+    try {
+      await this.triggerRouteRecomputation();
+    } finally {
+      this.recomputing = false;
+      if (this.rerunRequested) {
+        this.rerunRequested = false;
+        this.scheduleRouteRecomputation();
+      }
+    }
+  }
+
   async triggerRouteRecomputation(): Promise<void> {
     this.logger.log('Iniciando proceso de recalculo de rutas óptimas...');
 
     // 1. Obtener el mapa de distancias crudas actual
     const snapshot = this.distanceTable.getSnapshot();
 
-    // 2. Construir el Grafo en el formato que espera el microservicio (Zod Schema)
+    // 2. Construir el grafo en el formato que espera el microservicio:
+    //    Record<ciudad, RouteEdge[]> con RouteEdge = {code, distance, transportCost, enabled}.
+    //    (Antes mandaba {distance, price} anidado y el master lo rechazaba con 400 — bug del merge #21.)
+    type RouteEdge = {
+      code: string;
+      distance: number;
+      transportCost: number;
+      enabled: boolean;
+    };
+    const graph: Record<string, RouteEdge[]> = {};
 
-    const graph: Record<
-      string,
-      Record<string, { distance: number; price: number }>
-    > = {};
-
+    const ownEdges: RouteEdge[] = [];
     for (const entry of Object.values(snapshot)) {
-      if (!entry.enabled) continue; // Ignoramos nodos deshabilitados
-
-      // Aseguramos que el nodo origen exista en nuestro grafo simulado
-      if (!graph[CITY_ID]) graph[CITY_ID] = {};
-
-      // Creamos la conexión desde nuestra ciudad actual hacia el destino
-      graph[CITY_ID][entry.destinationCode] = {
+      ownEdges.push({
+        code: entry.destinationCode,
         distance: entry.distance ?? 0,
-        price: entry.transportCost ?? 0,
-      };
+        transportCost: entry.transportCost ?? 0,
+        enabled: entry.enabled,
+      });
+      // Cada destino debe existir como nodo del grafo para que Dijkstra le calcule
+      // distancia (aunque hoy solo conozcamos las aristas de nuestra propia ciudad).
+      if (!graph[entry.destinationCode]) graph[entry.destinationCode] = [];
     }
+    graph[CITY_ID] = ownEdges;
 
     // 3. Enviar el trabajo al microservicio (POST /job)
     try {

@@ -29,8 +29,10 @@ services:
       - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
       - CITY_ID=${CITY_ID}
       - USE_AMQP=true
+      - JOB_MASTER_URL=http://job-master:3001
     depends_on:
       - db
+      - job-master
     networks:
       - quack-net
 
