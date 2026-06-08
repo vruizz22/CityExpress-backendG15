@@ -13,6 +13,7 @@ import {
   PackageDeliveryService,
 } from '@/routing/package-delivery.service';
 import { RoutingSubscriberService } from '@/routing/routing-subscriber.service';
+import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
 
 @Module({
   providers: [
@@ -23,6 +24,7 @@ import { RoutingSubscriberService } from '@/routing/routing-subscriber.service';
     PendingPackagesRepository,
     PackageService,
     RoutingSubscriberService,
+    RoutingOrchestratorService,
     {
       provide: MESSAGE_BROKER,
       useFactory: async () => {
