@@ -7,7 +7,9 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 COPY package*.json tsconfig*.json ./
-RUN npm ci
+# npm install (no `npm ci`): jobs-service no versiona package-lock.json, y `npm ci`
+# requiere lockfile (si no, falla). Mantiene el multi-stage liviano igual.
+RUN npm install
 
 COPY src ./src
 RUN npm run build
@@ -18,7 +20,7 @@ FROM node:18-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 
