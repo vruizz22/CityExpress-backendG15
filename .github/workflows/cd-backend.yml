@@ -13,18 +13,20 @@ concurrency:
   group: cd-backend
   cancel-in-progress: false
 
-permissions:
-  id-token: write # requerido para OIDC con AWS
-  contents: read
-
+# Permisos por job (least-privilege): solo `deploy` necesita id-token para OIDC.
 jobs:
   # Reusa el workflow de calidad como gate: si falla, no se despliega.
   quality:
+    permissions:
+      contents: read
     uses: ./.github/workflows/ci.yml
 
   deploy:
     name: Build → ECR → CodeDeploy
     needs: quality
+    permissions:
+      id-token: write # requerido para OIDC con AWS
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
