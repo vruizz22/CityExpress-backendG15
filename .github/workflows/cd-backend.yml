@@ -33,6 +33,7 @@ jobs:
       AWS_REGION: us-east-1
       ECR_REGISTRY: 353731341232.dkr.ecr.us-east-1.amazonaws.com
       ECR_REPOSITORY: cityexpress-master
+      ECR_JOBS_REPOSITORY: cityexpress-jobs
       CODEDEPLOY_APP: cityexpress-backend
       CODEDEPLOY_GROUP: cityexpress-backend-dg
     steps:
@@ -55,6 +56,12 @@ jobs:
         run: |
           IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:${{ steps.meta.outputs.sha }}"
           docker build --platform linux/amd64 -t "$IMAGE" -f Dockerfile .
+          docker push "$IMAGE"
+
+      - name: Build & push jobs-service image
+        run: |
+          IMAGE="$ECR_REGISTRY/$ECR_JOBS_REPOSITORY:${{ steps.meta.outputs.sha }}"
+          docker build --platform linux/amd64 -t "$IMAGE" -f jobs-service/Dockerfile jobs-service
           docker push "$IMAGE"
 
       - name: Package CodeDeploy bundle
