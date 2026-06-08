@@ -12,8 +12,11 @@ files:
 
 hooks:
   AfterInstall:
+    # 900s (no 300): el primer pull de imágenes nuevas en la t3.micro tarda
+    # ~6 min (imágenes grandes). Con 300s el hook moría a mitad del pull →
+    # HEALTH_CONSTRAINTS. 900 da margen aunque no haya capas cacheadas.
     - location: deploy/pull_and_up.sh
-      timeout: 300
+      timeout: 900
       runas: root
   ValidateService:
     - location: deploy/healthcheck.sh
