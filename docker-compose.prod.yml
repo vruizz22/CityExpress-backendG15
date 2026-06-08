@@ -30,7 +30,11 @@ services:
       - CITY_ID=${CITY_ID}
       - USE_AMQP=true
       - JOB_MASTER_URL=http://job-master:3001
-      - AUTH0_ISSUER=${AUTH0_ISSUER:-https://frontendg15cityexpress.us.auth0.com/}
+      # OJO: el JwtStrategy (passport) lee AUTH0_DOMAIN (host pelado, sin https://
+      # ni "/") para armar jwksUri e issuer. Antes esto pasaba AUTH0_ISSUER, que
+      # el código NO lee → domain=undefined → jwksUri https://undefined → 401 en
+      # toda ruta con guard.
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN:-frontendg15cityexpress.us.auth0.com}
       - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-https://api.andresitowan.com}
       - AUTH0_ROLES_CLAIM=${AUTH0_ROLES_CLAIM:-https://cityexpress/roles}
     depends_on:
