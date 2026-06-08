@@ -1,0 +1,88 @@
+name: CD Backend
+
+# RNF08: push a main → (gate) CI verde → build imagen → ECR privado → bundle a
+# S3 → CodeDeploy a la EC2. Auth a AWS por OIDC (sin access keys de larga vida).
+on:
+  push:
+    branches: [main]
+  # Botón "Run workflow" (Actions) para redeploys/rollbacks manuales. Solo
+  # aparece una vez que este archivo está en la rama por defecto (main).
+  workflow_dispatch: {}
+
+concurrency:
+  group: cd-backend
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # requerido para OIDC con AWS
+  contents: read
+
+jobs:
+  # Reusa el workflow de calidad como gate: si falla, no se despliega.
+  quality:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Build → ECR → CodeDeploy
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AWS_REGION: us-east-1
+      ECR_REGISTRY: 353731341232.dkr.ecr.us-east-1.amazonaws.com
+      ECR_REPOSITORY: cityexpress-master
+      CODEDEPLOY_APP: cityexpress-backend
+      CODEDEPLOY_GROUP: cityexpress-backend-dg
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Short SHA
+        id: meta
+        run: echo "sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push master image
+        run: |
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:${{ steps.meta.outputs.sha }}"
+          docker build --platform linux/amd64 -t "$IMAGE" -f Dockerfile .
+          docker push "$IMAGE"
+
+      - name: Package CodeDeploy bundle
+        run: |
+          echo "${{ steps.meta.outputs.sha }}" > image_tag
+          chmod +x deploy/*.sh
+          zip -r bundle.zip appspec.yml docker-compose.prod.yml deploy image_tag
+
+      - name: Upload bundle to S3
+        run: |
+          aws s3 cp bundle.zip \
+            "s3://${{ vars.DEPLOY_ARTIFACTS_BUCKET }}/master/${{ steps.meta.outputs.sha }}.zip"
+
+      - name: Create CodeDeploy deployment
+        run: |
+          DEPLOY_ID=$(aws deploy create-deployment \
+            --application-name "$CODEDEPLOY_APP" \
+            --deployment-group-name "$CODEDEPLOY_GROUP" \
+            --description "main@${{ steps.meta.outputs.sha }}" \
+            --file-exists-behavior OVERWRITE \
+            --s3-location bucket=${{ vars.DEPLOY_ARTIFACTS_BUCKET }},key=master/${{ steps.meta.outputs.sha }}.zip,bundleType=zip \
+            --query deploymentId --output text)
+          echo "Deployment: $DEPLOY_ID"
+          echo "deploy_id=$DEPLOY_ID" >> "$GITHUB_OUTPUT"
+          aws deploy wait deployment-successful --deployment-id "$DEPLOY_ID"
+        id: deploy
+
+      - name: Deployment failed — dump events
+        if: failure() && steps.deploy.outputs.deploy_id != ''
+        run: |
+          aws deploy get-deployment \
+            --deployment-id "${{ steps.deploy.outputs.deploy_id }}" \
+            --query 'deploymentInfo.[status,errorInformation]' --output json || true
