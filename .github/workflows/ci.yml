@@ -4,7 +4,9 @@ on:
   pull_request:
     branches: [main, develop]
   push:
-    branches: [main, develop]
+    branches: [develop]
+  # Reusable desde cd-backend.yml (gate de calidad antes de desplegar a main).
+  workflow_call: {}
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -19,13 +21,13 @@ jobs:
       # Postgres dummy URL para que `prisma generate` no falle en CI.
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: pnpm
@@ -47,7 +49,7 @@ jobs:
 
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage
           path: coverage/
