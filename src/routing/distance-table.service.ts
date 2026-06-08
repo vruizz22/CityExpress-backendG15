@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { CENTRAL_ID, cityRoutingKey } from '@/config/city.config';
 import {
   DistanceTableEntry,
@@ -33,6 +33,7 @@ export class DistanceTableService implements OnModuleInit {
 
   constructor(
     @Inject(MESSAGE_BROKER) private readonly broker: MessageBrokerService,
+    @Inject(forwardRef(() => RoutingOrchestratorService))
     private readonly routingOrchestrator: RoutingOrchestratorService,
   ) {}
 

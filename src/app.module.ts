@@ -8,6 +8,23 @@ import { JobsModule } from '@/jobs/jobs.module';
 
 @Module({
   imports: [PackagesModule, RoutingModule, RoutesModule, JobsModule],
+import { AuthModule } from '@/auth/auth.module';
+import { RoutingCalcModule } from '@/routing-calc/routing-calc.module';
+import { ShipmentsModule } from '@/shipments/shipments.module';
+import { PaymentsModule } from '@/payments/payments.module';
+import { DevSeedModule } from '@/dev/dev-seed.module';
+
+@Module({
+  imports: [
+    PackagesModule,
+    RoutingModule,
+    RoutesModule,
+    AuthModule,
+    RoutingCalcModule,
+    ShipmentsModule,
+    PaymentsModule,
+    DevSeedModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

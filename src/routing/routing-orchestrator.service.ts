@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { DistanceTableService, RoutingTables } from './distance-table.service';
 import { CITY_ID } from '@/config/city.config';
 
@@ -9,7 +9,10 @@ export class RoutingOrchestratorService {
   private readonly jobMasterUrl =
     process.env.JOB_MASTER_URL || 'http://localhost:3001';
 
-  constructor(private readonly distanceTable: DistanceTableService) {}
+  constructor(
+    @Inject(forwardRef(() => DistanceTableService))
+    private readonly distanceTable: DistanceTableService,
+  ) {}
 
   // --- Debounce / anti-spam del recálculo (RNF01 / RNF03) ---
   // Agrupa ráfagas de cost-update en un solo recálculo y evita solapar jobs.

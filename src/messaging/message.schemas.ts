@@ -54,3 +54,22 @@ export const DistanceTableMessageSchema = BaseMessageSchema.extend({
 export const AckMessageSchema = BaseMessageSchema.extend({
   type: z.enum(['ack', 'nack']),
 });
+
+export const PaymentStatusMessageSchema = BaseMessageSchema.extend({
+  type: z.literal('payment-status'),
+  pkgId: z.string().min(1),
+  payment_token: z.string().min(1),
+  data: z.object({
+    status: z.enum(['TRYING', 'SUCCESS', 'FAILED']),
+    paymentId: z.string().min(1),
+    amount: z.number(),
+    currency: z.string().min(1),
+    destinationId: z.string().min(1),
+    criteria: z.string().min(1),
+    routeMetricCost: z.number(),
+    maxHops: z.number().int(),
+    authorizationCode: z.string().optional(),
+    transactionDate: z.string().optional(),
+    reason: z.string().optional(),
+  }),
+});
