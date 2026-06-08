@@ -137,8 +137,11 @@ export class PaymentsService {
       throw new ForbiddenException('No puedes confirmar este pago.');
     }
 
-    if (payment.status !== 'TRYING') {
+    if (payment.status === 'SUCCESS' || payment.status === 'FAILED') {
       return this.resultOf(payment);
+    }
+    if (payment.status === 'COMMITTING') {
+      return this.waitForFinalState(payment.id);
     }
 
     const shipment = await this.prisma.userShipment.findUnique({
@@ -154,13 +157,29 @@ export class PaymentsService {
       });
     }
 
+    const claim = await this.prisma.payment.updateMany({
+      where: { id: payment.id, status: 'TRYING' },
+      data: { status: 'COMMITTING' },
+    });
+    if (claim.count === 0) {
+      return this.waitForFinalState(payment.id);
+    }
+
     let success = false;
     let authorizationCode: string | undefined;
     let transactionDate: string | undefined;
     let reason: string | undefined;
     let responseRaw: Prisma.InputJsonValue | undefined;
     try {
-      const res = await this.webpay.commit(token);
+      let res: Awaited<ReturnType<typeof this.webpay.commit>>;
+      try {
+        res = await this.webpay.commit(token);
+      } catch (commitErr) {
+        this.logger.warn(
+          `commit de Webpay falló (${String(commitErr)}); consultando status`,
+        );
+        res = await this.webpay.status(token);
+      }
       responseRaw = res as unknown as Prisma.InputJsonValue;
       success = res.response_code === 0 && res.status === 'AUTHORIZED';
       authorizationCode = res.authorization_code;
@@ -191,6 +210,19 @@ export class PaymentsService {
     return this.resultOf(payment);
   }
 
+  private async waitForFinalState(id: string) {
+    for (let i = 0; i < 25; i++) {
+      const p = await this.prisma.payment.findUnique({ where: { id } });
+      if (p && p.status !== 'TRYING' && p.status !== 'COMMITTING') {
+        return this.resultOf(p);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    const p = await this.prisma.payment.findUnique({ where: { id } });
+    if (!p) throw new NotFoundException('Pago no encontrado');
+    return this.resultOf(p);
+  }
+
   private async finalize(
     payment: Payment,
     shipment: UserShipment,
@@ -203,7 +235,7 @@ export class PaymentsService {
     },
   ) {
     const claimed = await this.prisma.payment.updateMany({
-      where: { id: payment.id, status: 'TRYING' },
+      where: { id: payment.id, status: { in: ['TRYING', 'COMMITTING'] } },
       data: {
         status,
         authorizationCode: extra.authorizationCode ?? null,

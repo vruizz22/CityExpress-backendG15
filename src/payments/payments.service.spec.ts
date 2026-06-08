@@ -43,9 +43,13 @@ interface QueryArgs {
 }
 
 const matches = (row: object, where: Where) =>
-  Object.entries(where).every(
-    ([k, v]) => (row as Record<string, unknown>)[k] === v,
-  );
+  Object.entries(where).every(([k, v]) => {
+    const actual = (row as Record<string, unknown>)[k];
+    if (v && typeof v === 'object' && 'in' in v) {
+      return (v as { in: unknown[] }).in.includes(actual);
+    }
+    return actual === v;
+  });
 
 function createPrismaMock(payments: PaymentRow[], shipments: ShipmentRow[]) {
   return {

@@ -56,4 +56,9 @@ export class WebpayService {
     const tx = this.buildTransaction();
     return (await tx.commit(token)) as WebpayCommitResponse;
   }
+
+  async status(token: string): Promise<WebpayCommitResponse> {
+    const tx = this.buildTransaction();
+    return (await tx.status(token)) as WebpayCommitResponse;
+  }
 }
