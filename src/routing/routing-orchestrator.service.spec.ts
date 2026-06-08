@@ -1,5 +1,6 @@
 import { RoutingOrchestratorService } from './routing-orchestrator.service';
 import { DistanceTableService } from './distance-table.service';
+import { ReceivedTableRepository } from '@/routing-calc/received-table.repository';
 
 const flush = () => Promise.resolve();
 
@@ -14,7 +15,13 @@ describe('RoutingOrchestratorService - debounce', () => {
     const distanceTable = {
       getSnapshot: jest.fn().mockReturnValue({}),
     } as unknown as DistanceTableService;
-    const orchestrator = new RoutingOrchestratorService(distanceTable);
+    const receivedTables = {
+      getAllTables: jest.fn().mockResolvedValue({}),
+    } as unknown as ReceivedTableRepository;
+    const orchestrator = new RoutingOrchestratorService(
+      distanceTable,
+      receivedTables,
+    );
     const triggerSpy = jest
       .spyOn(orchestrator, 'triggerRouteRecomputation')
       .mockResolvedValue(undefined);

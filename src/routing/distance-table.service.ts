@@ -1,7 +1,20 @@
-import { forwardRef, Inject, Injectable, OnModuleInit } from '@nestjs/common';
-import { CENTRAL_ID, cityRoutingKey } from '@/config/city.config';
 import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
+import {
+  CENTRAL_ID,
+  CITY_CODES,
+  CITY_ID,
+  cityRoutingKey,
+} from '@/config/city.config';
+import {
+  AckMessage,
   DistanceTableEntry,
+  DistanceTableMessage,
   DistanceTableRequestMessage,
 } from '@/messaging/message.types';
 import {
@@ -12,6 +25,7 @@ import { AmqpMessageBrokerService } from '@/messaging/amqp-message-broker.servic
 import { createBaseMessage } from '@/messaging/message.factory';
 import { DistanceTableMessageSchema } from '@/messaging/message.schemas';
 import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
+import { ReceivedTableRepository } from '@/routing-calc/received-table.repository';
 
 export interface ComputedRoute {
   nextHop: string | null;
@@ -27,14 +41,23 @@ export interface RoutingTables {
 
 @Injectable()
 export class DistanceTableService implements OnModuleInit {
+  private readonly logger = new Logger(DistanceTableService.name);
+
   private distances = new Map<string, DistanceTableEntry>();
 
   private computedRoutes: RoutingTables | null = null;
+
+  // Anti-loop / anti-spam: no re-disparar fanout más de una vez por ventana.
+  private readonly fanoutThrottleMs = Number(
+    process.env.TABLE_FANOUT_THROTTLE_MS ?? 5000,
+  );
+  private lastFanoutAt = 0;
 
   constructor(
     @Inject(MESSAGE_BROKER) private readonly broker: MessageBrokerService,
     @Inject(forwardRef(() => RoutingOrchestratorService))
     private readonly routingOrchestrator: RoutingOrchestratorService,
+    private readonly receivedTables: ReceivedTableRepository,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -44,14 +67,100 @@ export class DistanceTableService implements OnModuleInit {
     await this.requestInitialTable();
   }
 
+  /** Pide a la central nuestra tabla de distancias. RF06. */
   async requestInitialTable(): Promise<void> {
     const base = createBaseMessage('request');
     const message: DistanceTableRequestMessage = {
       ...base,
       type: 'request',
+      source: CITY_ID,
       data: { ask: 'distance-table' },
     };
     await this.broker.send(cityRoutingKey(CENTRAL_ID), message);
+  }
+
+  /**
+   * RF06: al recibir nuestra tabla desde la central, pedimos su tabla a todas
+   * las demás ciudades (excluye la propia y la central). Throttle para no
+   * inundar el broker ante ráfagas de cost-update.
+   */
+  async requestTablesFromAllCities(): Promise<void> {
+    const now = Date.now();
+    if (now - this.lastFanoutAt < this.fanoutThrottleMs) {
+      this.logger.debug('Fanout de tablas omitido por throttle.');
+      return;
+    }
+    this.lastFanoutAt = now;
+
+    const targets = CITY_CODES.filter(
+      (code) => code !== CITY_ID && code !== CENTRAL_ID,
+    );
+    this.logger.log(`Solicitando tablas a ${targets.length} ciudades (RF06).`);
+    for (const code of targets) {
+      const base = createBaseMessage('request');
+      const message: DistanceTableRequestMessage = {
+        ...base,
+        type: 'request',
+        source: CITY_ID,
+        data: { ask: 'distance-table' },
+      };
+      await this.broker.send(cityRoutingKey(code), message);
+    }
+  }
+
+  /**
+   * RF06: respondemos un request de otra ciudad enviando ACK y luego nuestra
+   * tabla vigente como cost-update a la cola de la ciudad solicitante.
+   */
+  async respondWithOwnTable(requesterCityId: string): Promise<void> {
+    if (!requesterCityId || requesterCityId === CITY_ID) {
+      return;
+    }
+    const base = createBaseMessage('cost-update');
+    await this.sendAck(requesterCityId, base.idpk, base.msgId, 'ack');
+
+    const message: DistanceTableMessage = {
+      ...base,
+      type: 'cost-update',
+      cityId: CITY_ID,
+      data: { distances: this.getSnapshot() },
+    };
+    await this.broker.send(cityRoutingKey(requesterCityId), message);
+  }
+
+  /** Aplica nuestra propia tabla (recibida de la central). Dispara fanout. */
+  applyOwnTable(distances: Record<string, DistanceTableEntry>): void {
+    this.updateDistances(distances);
+    void this.requestTablesFromAllCities();
+  }
+
+  /**
+   * Aplica la tabla de OTRA ciudad: la guarda en la matriz (ReceivedTable) y
+   * agenda recálculo. NO hace fanout (rompe el ciclo request→respuesta→request).
+   */
+  async applyPeerTable(
+    cityId: string,
+    distances: Record<string, DistanceTableEntry>,
+  ): Promise<void> {
+    await this.receivedTables.upsertTable(cityId, distances);
+    this.routingOrchestrator.scheduleRouteRecomputation();
+  }
+
+  /** ACK/NACK para flujos de tabla. RF06. */
+  async sendAck(
+    destinationCityId: string,
+    idpk: string,
+    msgId: string,
+    type: 'ack' | 'nack',
+  ): Promise<void> {
+    const ack: AckMessage = {
+      idpk,
+      msgId,
+      type,
+      timestamp: new Date().toISOString(),
+      cityId: CITY_ID,
+    };
+    await this.broker.send(cityRoutingKey(destinationCityId), ack);
   }
 
   updateFromMessage(message: unknown): void {
@@ -72,7 +181,7 @@ export class DistanceTableService implements OnModuleInit {
 
   updateComputedRoutes(routes: RoutingTables): void {
     this.computedRoutes = routes;
-    console.log('Nuevas tablas de enrutamiento aplicadas exitosamente.');
+    this.logger.log('Nuevas tablas de enrutamiento aplicadas exitosamente.');
   }
 
   getNextHop(
@@ -80,7 +189,7 @@ export class DistanceTableService implements OnModuleInit {
     criteria: 'price' | 'distance',
   ): string | null {
     if (!this.computedRoutes) {
-      console.warn(
+      this.logger.warn(
         `getNextHop: Las tablas de enrutamiento aún no han sido calculadas.`,
       );
       return null;

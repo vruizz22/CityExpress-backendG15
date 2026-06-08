@@ -30,6 +30,8 @@ export interface DistanceTableMessage extends BaseMessage {
 
 export interface DistanceTableRequestMessage extends BaseMessage {
   type: 'request';
+  // Código de la ciudad solicitante (a cuya cola se debe responder). RF06.
+  source: string;
   data: {
     ask: 'distance-table';
   };

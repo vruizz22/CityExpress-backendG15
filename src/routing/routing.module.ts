@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { PrismaService } from '@/prisma.service';
 import { MESSAGE_BROKER } from '@/messaging/message-broker.interface';
 import { NoopMessageBrokerService } from '@/messaging/noop-message-broker.service';
+import { RoutingCalcModule } from '@/routing-calc/routing-calc.module';
 import { AuditService } from '@/routing/audit.service';
 import { DistanceTableService } from '@/routing/distance-table.service';
 import { PackageEventsRepository } from '@/routing/package-events.repository';
@@ -16,6 +17,7 @@ import { RoutingSubscriberService } from '@/routing/routing-subscriber.service';
 import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
 
 @Module({
+  imports: [RoutingCalcModule],
   providers: [
     PrismaService,
     DistanceTableService,
@@ -38,6 +40,12 @@ import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.servi
     },
     { provide: PackageDeliveryService, useClass: NoopPackageDeliveryService },
   ],
-  exports: [PackageService, DistanceTableService, AuditService, MESSAGE_BROKER],
+  exports: [
+    PackageService,
+    DistanceTableService,
+    AuditService,
+    PackageEventsRepository,
+    MESSAGE_BROKER,
+  ],
 })
 export class RoutingModule {}
