@@ -1,6 +1,14 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { DistanceTableService, RoutingTables } from './distance-table.service';
 import { CITY_ID } from '@/config/city.config';
+import { ReceivedTableRepository } from '@/routing-calc/received-table.repository';
+
+type RouteEdge = {
+  code: string;
+  distance: number;
+  transportCost: number;
+  enabled: boolean;
+};
 
 @Injectable()
 export class RoutingOrchestratorService {
@@ -12,6 +20,7 @@ export class RoutingOrchestratorService {
   constructor(
     @Inject(forwardRef(() => DistanceTableService))
     private readonly distanceTable: DistanceTableService,
+    private readonly receivedTables: ReceivedTableRepository,
   ) {}
 
   // --- Debounce / anti-spam del recálculo (RNF01 / RNF03) ---
@@ -62,35 +71,12 @@ export class RoutingOrchestratorService {
   async triggerRouteRecomputation(): Promise<void> {
     this.logger.log('Iniciando proceso de recalculo de rutas óptimas...');
 
-    // 1. Obtener el mapa de distancias crudas actual
-    const snapshot = this.distanceTable.getSnapshot();
+    // 1. Construir el grafo COMPLETO (matriz de adyacencia) con la tabla propia
+    //    + las tablas recibidas de todas las ciudades (RF06). Antes solo se
+    //    enviaba un salto (graph[CITY_ID]) y el ruteo "óptimo" era directo.
+    const graph = await this.buildFullGraph();
 
-    // 2. Construir el grafo en el formato que espera el microservicio:
-    //    Record<ciudad, RouteEdge[]> con RouteEdge = {code, distance, transportCost, enabled}.
-    //    (Antes mandaba {distance, price} anidado y el master lo rechazaba con 400 — bug del merge #21.)
-    type RouteEdge = {
-      code: string;
-      distance: number;
-      transportCost: number;
-      enabled: boolean;
-    };
-    const graph: Record<string, RouteEdge[]> = {};
-
-    const ownEdges: RouteEdge[] = [];
-    for (const entry of Object.values(snapshot)) {
-      ownEdges.push({
-        code: entry.destinationCode,
-        distance: entry.distance ?? 0,
-        transportCost: entry.transportCost ?? 0,
-        enabled: entry.enabled,
-      });
-      // Cada destino debe existir como nodo del grafo para que Dijkstra le calcule
-      // distancia (aunque hoy solo conozcamos las aristas de nuestra propia ciudad).
-      if (!graph[entry.destinationCode]) graph[entry.destinationCode] = [];
-    }
-    graph[CITY_ID] = ownEdges;
-
-    // 3. Enviar el trabajo al microservicio (POST /job)
+    // 2. Enviar el trabajo al microservicio (POST /job)
     try {
       const response = await fetch(`${this.jobMasterUrl}/job`, {
         method: 'POST',
@@ -176,5 +162,54 @@ export class RoutingOrchestratorService {
     this.logger.error(
       `Se alcanzó el límite de reintentos para obtener el resultado del Job ${jobId}`,
     );
+  }
+
+  /**
+   * Arma la matriz de adyacencia completa en el formato que espera el
+   * jobs-service / Dijkstra de los workers: `Record<city, RouteEdge[]>`.
+   * Combina la tabla propia (snapshot vigente) con las tablas recibidas de las
+   * demás ciudades (RF06). Las ciudades que no respondieron simplemente no
+   * tienen aristas → costo infinito (RNF03).
+   */
+  private async buildFullGraph(): Promise<Record<string, RouteEdge[]>> {
+    const graph: Record<string, RouteEdge[]> = {};
+
+    const toEdges = (
+      distances: Record<
+        string,
+        {
+          destinationCode: string;
+          distance: number;
+          transportCost: number;
+          enabled: boolean;
+        }
+      >,
+    ): RouteEdge[] =>
+      Object.values(distances).map((entry) => ({
+        code: entry.destinationCode,
+        distance: entry.distance ?? 0,
+        transportCost: entry.transportCost ?? 0,
+        enabled: entry.enabled,
+      }));
+
+    const ensureNode = (code: string): void => {
+      if (!graph[code]) graph[code] = [];
+    };
+
+    // 1. Tablas recibidas de otras ciudades (matriz multi-salto).
+    const receivedTables = await this.receivedTables.getAllTables();
+    for (const [city, distances] of Object.entries(receivedTables)) {
+      ensureNode(city);
+      const edges = toEdges(distances);
+      graph[city] = edges;
+      for (const edge of edges) ensureNode(edge.code);
+    }
+
+    // 2. Tabla propia (autoritativa para nuestra ciudad).
+    const ownEdges = toEdges(this.distanceTable.getSnapshot());
+    graph[CITY_ID] = ownEdges;
+    for (const edge of ownEdges) ensureNode(edge.code);
+
+    return graph;
   }
 }

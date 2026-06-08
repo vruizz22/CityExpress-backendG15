@@ -51,6 +51,15 @@ export const DistanceTableMessageSchema = BaseMessageSchema.extend({
   }),
 });
 
+// RF06 — request de tabla de distancias que envían otras ciudades a nuestra cola.
+export const DistanceTableRequestSchema = BaseMessageSchema.extend({
+  type: z.literal('request'),
+  source: z.string().min(1),
+  data: z.object({
+    ask: z.literal('distance-table'),
+  }),
+});
+
 export const AckMessageSchema = BaseMessageSchema.extend({
   type: z.enum(['ack', 'nack']),
 });

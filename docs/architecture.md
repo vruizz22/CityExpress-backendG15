@@ -149,3 +149,94 @@ sequenceDiagram
 
 - Ayudantías AY3 (UML), AY5 (API Gateway), AY6 (NFRs), AY8 (Workers), AY10/AY12 (Diagramación avanzada + Event Bus).
 - Enunciado E1 — `docs/2026-1 _ IIC2173 - E1 _ CityExpress.pdf`.
+
+---
+
+## 9. E2 — Broker, coordinación entre ciudades y envío inicial (RDOC01)
+
+> Sección de la E2: cómo el broker, las colas, los ACK/NACK, los mensajes
+> `distance-table`/`cost-update` y el envío inicial post-pago encajan en la
+> arquitectura. Cubre **RF06**, parte de **RF04/RF07**, **RNF03** y **RNF07**.
+
+### 9.1 Broker y colas
+
+- **RabbitMQ** (`amqplib`), exchange por defecto `fulfillment.x` (`RABBITMQ_EXCHANGE`).
+- Una **cola por ciudad**; routing key `city.<code>` (`cityRoutingKey`). La central
+  es `city.central`. Cada master consume **solo su** cola (`RoutingSubscriberService`
+  se suscribe a `city.<CITY_ID>`).
+- Resiliencia (`AmqpMessageBrokerService`): reconexión con backoff Fibonacci,
+  `prefetch(10)`, buffer de mensajes mientras no hay canal, **NACK sin requeue**
+  ante JSON malformado y **NACK con requeue** ante error del handler.
+
+### 9.2 Tipos de mensaje (E2)
+
+| `type` | Dirección | Efecto |
+|---|---|---|
+| `request` (`data.ask = distance-table`, `source`) | ciudad ⇆ ciudad / central | el receptor responde con ACK + su `cost-update` |
+| `cost-update` / `distance-table` | central → ciudad (tabla propia) **o** ciudad → ciudad (tabla peer) | actualizar distancias / guardar matriz |
+| `ack` / `nack` | respuesta | terminal: solo se registra |
+| `package-transit` | ciudad → ciudad | ruteo del paquete (forwarding) |
+
+### 9.3 Regla anti-loop (RF06 "evitando ciclos infinitos")
+
+Un `cost-update` se interpreta por su `cityId`:
+
+- `cityId == CITY_ID` (o sin `cityId`, viene de la **central**) ⇒ **tabla propia**:
+  se aplica a las distancias locales y se dispara **fanout** (pedir tablas a las
+  demás ciudades).
+- `cityId != CITY_ID` ⇒ **tabla de un peer** (respuesta a nuestro request): se
+  guarda en `ReceivedTable` + ACK al peer, **sin** fanout.
+
+Eso rompe el ciclo `request → cost-update → request`. Refuerzos adicionales:
+dedup por `msgId` (TTL) en el subscriber, throttle del fanout, y debounce del
+recálculo de rutas.
+
+### 9.4 Secuencia — intercambio de tablas (RF06)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Central
+    participant A as Ciudad A (yo)
+    participant B as Ciudad B (peer)
+
+    Central->>A: cost-update (cityId=A) — mi tabla
+    Note over A: tabla propia ⇒ fanout
+    A->>B: request {ask:distance-table, source:A}
+    B-->>A: ack
+    B->>A: cost-update (cityId=B) — tabla de B
+    A-->>B: ack
+    Note over A: applyPeerTable(B) → ReceivedTable<br/>scheduleRouteRecomputation()
+    A->>A: recompute (jobs-service) con matriz completa
+```
+
+### 9.5 Secuencia — envío inicial post-pago (RF04 + RNF07)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Webpay
+    participant Pay as PaymentsService
+    participant Init as InitialShipmentService
+    participant DT as DistanceTableService
+    participant Broker
+    participant Next as Siguiente salto
+
+    Webpay-->>Pay: callback SUCCESS
+    Note over Pay: claim idempotente del pago (1 sola vez)
+    Pay->>Init: send(packageBody)
+    Init->>DT: getNextHop(destinationId, criteria)
+    alt sin ruta
+        DT-->>Init: null
+        Init-->>Pay: throw ⇒ estado pending-routing
+    else hay ruta
+        DT-->>Init: nextHop
+        Note over Init: recordInitialSent (idpk=initial:<id>)<br/>P2002 ⇒ duplicate ⇒ no publica
+        Init->>Broker: publish package-transit (cityId=A) → city.<nextHop>
+        Init-->>Pay: ok ⇒ estado sent
+    end
+```
+
+El monto cobrado queda **fijo** al pagar; recomputaciones posteriores de rutas
+solo afectan el siguiente salto, no el precio (E2). El estado `sent` se muestra
+en el front como *"Enviado al siguiente salto"* (`statusLabels.js`).
