@@ -333,4 +333,59 @@ describe('PackageService', () => {
     expect(pending.removePending).toHaveBeenCalledWith('pending-redirect');
     expect(pending.removePending).not.toHaveBeenCalledWith('pending-noroute');
   });
+
+  it('drains the backlog in bounded keyset batches without loading it whole', async () => {
+    process.env.PENDING_ROUTE_BATCH_SIZE = '2';
+    process.env.PENDING_ROUTE_MAX_PER_RUN = '100';
+    try {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          PackageService,
+          { provide: MESSAGE_BROKER, useValue: broker },
+          { provide: AuditService, useValue: audit },
+          { provide: DistanceTableService, useValue: distanceTable },
+          { provide: PackageEventsRepository, useValue: packageEvents },
+          { provide: PendingPackagesRepository, useValue: pending },
+          { provide: PackageDeliveryService, useValue: delivery },
+        ],
+      }).compile();
+      const batchedService = module.get<PackageService>(PackageService);
+
+      const rec = (idpk: string) => ({
+        idpk,
+        packageId: `pkg-${idpk}`,
+        deliveryStrategy: 'direct',
+        maxHops: 1,
+        createdAt: new Date('2026-04-29T00:00:00.000Z'),
+        deliverNotBefore: null,
+        originId: 'central',
+        destinationId: 'HGW',
+        metaContent: '',
+        isMetaEncrypted: false,
+        constraints: {},
+        priorityClass: 'medium',
+        payment: 0,
+      });
+
+      pending.findPendingRoutes
+        .mockResolvedValueOnce([rec('a'), rec('b')]) // página llena (=batchSize) → sigue
+        .mockResolvedValueOnce([rec('c')]); // página corta → termina
+      distanceTable.getNextHop.mockReturnValue('HGW');
+
+      await batchedService.processPendingRoutes();
+
+      // Nunca pide "todo": pide lotes de 2 y pagina con el último idpk como cursor.
+      expect(pending.findPendingRoutes).toHaveBeenNthCalledWith(
+        1,
+        2,
+        undefined,
+      );
+      expect(pending.findPendingRoutes).toHaveBeenNthCalledWith(2, 2, 'b');
+      expect(pending.findPendingRoutes).toHaveBeenCalledTimes(2);
+      expect(pending.removePending).toHaveBeenCalledTimes(3);
+    } finally {
+      delete process.env.PENDING_ROUTE_BATCH_SIZE;
+      delete process.env.PENDING_ROUTE_MAX_PER_RUN;
+    }
+  });
 });

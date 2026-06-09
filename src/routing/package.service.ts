@@ -16,6 +16,7 @@ import { PackageEventsRepository } from '@/routing/package-events.repository';
 import { PendingPackagesRepository } from '@/routing/pending-packages.repository';
 import { PackageDeliveryService } from '@/routing/package-delivery.service';
 import { PackageBody } from '@dto/package.dto';
+import { PackageEvent } from '@prisma/client';
 
 @Injectable()
 export class PackageService {
@@ -27,6 +28,26 @@ export class PackageService {
     private readonly pendingRepository: PendingPackagesRepository,
     private readonly deliveryService: PackageDeliveryService,
   ) {}
+
+  // --- Drenado acotado del backlog de 'pending-route' (anti-OOM) ---
+  // El backlog se acumula mientras no hay rutas calculadas (getNextHop=null) y
+  // puede tener cientos de miles de filas. processPendingRoutes se invoca en CADA
+  // cost-update (tormenta del broker compartido); cargar la tabla entera a RAM, y
+  // en paralelo (prefetch=10), reventaba el heap del master. Por eso: drenamos en
+  // lotes con keyset, una sola corrida a la vez (single-flight) y espaciadas
+  // (throttle), con un tope por corrida para no inundar el broker de una.
+  private pendingRunning = false;
+  private lastPendingRunAt = 0;
+  private pendingRouteCursor: string | undefined = undefined;
+  private readonly pendingThrottleMs = Number(
+    process.env.PENDING_ROUTE_THROTTLE_MS ?? 3000,
+  );
+  private readonly pendingBatchSize = Number(
+    process.env.PENDING_ROUTE_BATCH_SIZE ?? 200,
+  );
+  private readonly pendingMaxPerRun = Number(
+    process.env.PENDING_ROUTE_MAX_PER_RUN ?? 2000,
+  );
 
   private async processFinalDestination(
     pkg: PackageBody,
@@ -158,42 +179,96 @@ export class PackageService {
   }
 
   async processPendingRoutes(): Promise<void> {
-    const pending = await this.pendingRepository.findPendingRoutes();
-    for (const record of pending) {
-      const pkg = this.toPackageBody(record);
-      if (pkg.maxHops <= 0) {
-        await this.auditService.reportExpired(pkg.id);
-        await this.pendingRepository.removePending(record.idpk);
-        continue;
-      }
+    // Single-flight: bajo la tormenta esto se llama decenas de veces; sin guard
+    // correrían en paralelo y cada corrida hidrataría el backlog → OOM. Si ya hay
+    // una corriendo, salimos (la corrida activa avanza el cursor por todos).
+    if (this.pendingRunning) {
+      return;
+    }
+    // Throttle: espaciamos las corridas para no martillar BD/broker en la ráfaga.
+    const now = Date.now();
+    if (now - this.lastPendingRunAt < this.pendingThrottleMs) {
+      return;
+    }
+    this.lastPendingRunAt = now;
+    this.pendingRunning = true;
+    try {
+      await this.drainPendingRoutes();
+    } finally {
+      this.pendingRunning = false;
+    }
+  }
 
-      const forwardedPackage = { ...pkg, maxHops: pkg.maxHops - 1 };
-
-      // --- NUEVA LÓGICA DE RUTEO POR CRITERIO (Para paquetes pendientes) ---
-      const constraints = pkg.constraints as
-        | Record<string, unknown>
-        | undefined;
-      const criteria = constraints?.criteria === 'price' ? 'price' : 'distance';
-
-      const nextCityId = this.distanceTable.getNextHop(
-        pkg.destinationId,
-        criteria,
+  /**
+   * Drena el backlog en lotes acotados (keyset por `idpk`) para no cargarlo
+   * entero a RAM. Avanza un cursor persistente entre corridas y lo reinicia al
+   * llegar al final (los no-ruteables quedan y se reintentan en la próxima
+   * pasada). Tope `pendingMaxPerRun` por corrida para no inundar el broker al
+   * despachar un backlog grande de golpe.
+   */
+  private async drainPendingRoutes(): Promise<void> {
+    let processed = 0;
+    while (processed < this.pendingMaxPerRun) {
+      const take = Math.min(
+        this.pendingBatchSize,
+        this.pendingMaxPerRun - processed,
+      );
+      const batch = await this.pendingRepository.findPendingRoutes(
+        take,
+        this.pendingRouteCursor,
       );
 
-      if (!nextCityId) {
-        continue; // Sigue pendiente si aún no hay ruta
+      if (batch.length === 0) {
+        this.pendingRouteCursor = undefined; // fin: reiniciar para la próxima pasada
+        return;
       }
 
-      await this.sendPackage(nextCityId, forwardedPackage);
-
-      if (nextCityId === pkg.destinationId) {
-        await this.auditService.reportTransit(pkg.id, pkg.destinationId);
-      } else {
-        await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
+      for (const record of batch) {
+        this.pendingRouteCursor = record.idpk;
+        await this.routePendingRecord(record);
       }
+      processed += batch.length;
 
-      await this.pendingRepository.removePending(record.idpk);
+      if (batch.length < take) {
+        this.pendingRouteCursor = undefined; // última página de esta pasada
+        return;
+      }
     }
+  }
+
+  /** Intenta rutear un pendiente: caduca, despacha o lo deja pendiente. */
+  private async routePendingRecord(record: PackageEvent): Promise<void> {
+    const pkg = this.toPackageBody(record);
+    if (pkg.maxHops <= 0) {
+      await this.auditService.reportExpired(pkg.id);
+      await this.pendingRepository.removePending(record.idpk);
+      return;
+    }
+
+    const forwardedPackage = { ...pkg, maxHops: pkg.maxHops - 1 };
+
+    // --- NUEVA LÓGICA DE RUTEO POR CRITERIO (Para paquetes pendientes) ---
+    const constraints = pkg.constraints as Record<string, unknown> | undefined;
+    const criteria = constraints?.criteria === 'price' ? 'price' : 'distance';
+
+    const nextCityId = this.distanceTable.getNextHop(
+      pkg.destinationId,
+      criteria,
+    );
+
+    if (!nextCityId) {
+      return; // Sigue pendiente si aún no hay ruta
+    }
+
+    await this.sendPackage(nextCityId, forwardedPackage);
+
+    if (nextCityId === pkg.destinationId) {
+      await this.auditService.reportTransit(pkg.id, pkg.destinationId);
+    } else {
+      await this.auditService.reportTransitRedirect(pkg.id, nextCityId);
+    }
+
+    await this.pendingRepository.removePending(record.idpk);
   }
 
   private async sendPackage(

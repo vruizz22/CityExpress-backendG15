@@ -26,11 +26,23 @@ export class PendingPackagesRepository {
     });
   }
 
-  async findPendingRoutes(): Promise<PackageEvent[]> {
+  /**
+   * Devuelve un lote acotado de pendientes de ruteo (keyset pagination por
+   * `idpk`). NUNCA carga toda la tabla: el backlog puede tener cientos de miles
+   * de filas y hidratarlas todas a RAM revienta el heap del master. El llamador
+   * itera pasando el último `idpk` visto en `afterIdpk` hasta vaciar.
+   */
+  async findPendingRoutes(
+    take: number,
+    afterIdpk?: string,
+  ): Promise<PackageEvent[]> {
     return this.prisma.packageEvent.findMany({
       where: {
         type: 'pending-route',
+        ...(afterIdpk ? { idpk: { gt: afterIdpk } } : {}),
       },
+      orderBy: { idpk: 'asc' },
+      take,
     });
   }
 
