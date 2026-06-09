@@ -101,8 +101,11 @@ export class RoutingOrchestratorService {
         `Trabajo encolado exitosamente en el Microservicio. Job ID: ${rawData.jobId}`,
       );
 
-      // 4. Iniciar el Sondeo (Polling) para esperar a que el Worker termine en Redis
-      void this.pollJobResult(rawData.jobId);
+      // 4. Sondeo (Polling) hasta que el Worker termine en Redis. Se AWAITea: si
+      //    no, `runRecomputation` libera el guard `recomputing` apenas se postea
+      //    el job (no al terminar), permitiendo recálculos solapados que se
+      //    pisan y acumulan trabajo/memoria. Con await, el guard cubre el ciclo.
+      await this.pollJobResult(rawData.jobId);
     } catch (error) {
       this.logger.error(
         'Error al conectar con el microservicio de rutas:',
