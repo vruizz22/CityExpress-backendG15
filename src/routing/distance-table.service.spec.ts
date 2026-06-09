@@ -7,6 +7,7 @@ import {
 import { MessageBrokerService } from '@/messaging/message-broker.interface';
 import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
 import { ReceivedTableRepository } from '@/routing-calc/received-table.repository';
+import { RouteRepository } from '@/routing/route.repository';
 import { CENTRAL_ID, CITY_CODES, CITY_ID } from '@/config/city.config';
 
 const buildDistances = (): Record<string, DistanceTableEntry> => ({
@@ -39,12 +40,17 @@ function makeService() {
     upsertTable: jest.fn().mockResolvedValue(undefined),
     getAllTables: jest.fn().mockResolvedValue({}),
   } as unknown as ReceivedTableRepository;
+  const routeRepository = {
+    saveSnapshot: jest.fn().mockResolvedValue(undefined),
+    findAll: jest.fn().mockResolvedValue([]),
+  } as unknown as RouteRepository;
   const service = new DistanceTableService(
     broker,
     orchestrator,
     receivedTables,
+    routeRepository,
   );
-  return { service, broker, orchestrator, receivedTables };
+  return { service, broker, orchestrator, receivedTables, routeRepository };
 }
 
 describe('DistanceTableService', () => {

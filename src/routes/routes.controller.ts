@@ -6,8 +6,8 @@ export class RoutesController {
   constructor(private readonly routesService: RoutesService) {}
 
   @Get()
-  getRoutes() {
-    const data = this.routesService.getRoutes();
+  async getRoutes() {
+    const data = await this.routesService.getRoutes();
     return { data };
   }
 }
