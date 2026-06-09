@@ -82,6 +82,24 @@ describe('RoutingSubscriberService', () => {
     expect(packageService.processPendingRoutes).toHaveBeenCalledTimes(1);
   });
 
+  it('trata la tabla con cityId en otra caja (p. ej. "tk3") como propia', async () => {
+    // CITY_ID por defecto es "TK3"; si la central/echo nos manda cityId "tk3"
+    // debe aplicarse a las distancias propias, no guardarse como peer.
+    const { broker, distanceTable, service } = makeSubscriber();
+    await service.onModuleInit();
+    const handler = getHandler(broker);
+
+    await handler({
+      type: 'cost-update',
+      cityId: 'tk3',
+      timestamp: '2026-04-29T00:00:00.000Z',
+      data: { distances },
+    });
+
+    expect(distanceTable.applyOwnTable).toHaveBeenCalledWith(distances);
+    expect(distanceTable.applyPeerTable).not.toHaveBeenCalled();
+  });
+
   it('stores a peer table and sends ACK back', async () => {
     const { broker, distanceTable, service } = makeSubscriber();
     await service.onModuleInit();

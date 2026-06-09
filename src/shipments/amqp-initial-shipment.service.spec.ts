@@ -50,7 +50,7 @@ describe('AmqpInitialShipmentService', () => {
       string,
       PackageTransitMessage,
     ];
-    expect(routingKey).toBe('city.COR');
+    expect(routingKey).toBe('city.cor');
     expect(message.type).toBe('package-transit');
     expect(message.packageBody.id).toBe('pkg-1');
   });
