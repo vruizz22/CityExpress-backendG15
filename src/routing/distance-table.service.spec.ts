@@ -163,6 +163,29 @@ describe('DistanceTableService', () => {
     expect(calls[1][1].cityId).toBe(CITY_ID.toLowerCase());
   });
 
+  it('throttles repeated responses to the same requester (anti-tormenta)', async () => {
+    const { service, broker } = makeService();
+    service.updateDistances(buildDistances());
+
+    await service.respondWithOwnTable('COR');
+    await service.respondWithOwnTable('COR'); // dentro de la ventana → omitido
+    await service.respondWithOwnTable('cor'); // misma ciudad, otra caja → omitido
+
+    // Solo la primera respuesta: 1 ack + 1 cost-update = 2 envíos.
+    expect((broker.send as jest.Mock).mock.calls).toHaveLength(2);
+  });
+
+  it('responde a ciudades distintas aunque una esté throttled', async () => {
+    const { service, broker } = makeService();
+    service.updateDistances(buildDistances());
+
+    await service.respondWithOwnTable('COR');
+    await service.respondWithOwnTable('HGW');
+
+    // 2 requesters distintos → 2 ack + 2 cost-update = 4 envíos.
+    expect((broker.send as jest.Mock).mock.calls).toHaveLength(4);
+  });
+
   it('stores a peer table without fanning out', async () => {
     const { service, broker, receivedTables, orchestrator } = makeService();
 

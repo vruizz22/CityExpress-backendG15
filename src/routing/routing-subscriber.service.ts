@@ -17,6 +17,30 @@ import {
 import { DistanceTableService } from '@/routing/distance-table.service';
 import { PackageService } from '@/routing/package.service';
 
+/** Coacciona a string solo valores escalares; el resto a un placeholder. */
+function scalar(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return value == null ? '-' : '?';
+}
+
+/** Resumen compacto de un mensaje entrante (sin serializar el payload entero). */
+function summarizeMessage(message: unknown): string {
+  if (!message || typeof message !== 'object') {
+    return scalar(message);
+  }
+  const m = message as {
+    type?: unknown;
+    cityId?: unknown;
+    source?: unknown;
+    msgId?: unknown;
+  };
+  const city = m.cityId ?? m.source;
+  return `type=${scalar(m.type)} city=${scalar(city)} msg=${scalar(m.msgId)}`;
+}
+
 @Injectable()
 export class RoutingSubscriberService implements OnModuleInit {
   private readonly logger = new Logger(RoutingSubscriberService.name);
@@ -33,7 +57,13 @@ export class RoutingSubscriberService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.broker.subscribe(cityRoutingKey(CITY_ID), async (message) => {
-      this.logger.debug(`Incoming raw: ${JSON.stringify(message)}`);
+      // Resumen barato por defecto. Serializar el payload completo (las tablas
+      // de distancias son enormes) en CADA mensaje satura RAM/CPU/disco bajo la
+      // tormenta de cost-updates. El payload completo solo con LOG_RAW_MESSAGES.
+      this.logger.debug(`Incoming: ${summarizeMessage(message)}`);
+      if (process.env.LOG_RAW_MESSAGES === 'true') {
+        this.logger.debug(`Incoming raw: ${JSON.stringify(message)}`);
+      }
       const envelope = MessageEnvelopeSchema.safeParse(message);
       if (!envelope.success) {
         this.logger.warn(
