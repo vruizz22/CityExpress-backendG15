@@ -1,15 +1,25 @@
 import { z } from 'zod';
 import { PackageBodySchema } from '@dto/package.dto';
 
+// Gate de entrada para CUALQUIER mensaje. La central (y otras ciudades) NO
+// siempre incluyen `idpk`/`msgId` en sus respuestas (ver docs/requirements.md
+// §6.2: la tabla de distancias llega sin esos campos). Si los exigimos aquí, el
+// envelope se rechaza y la tabla nunca se aplica → GET /routes devuelve todas
+// las ciudades como `enabled: false`. Por eso son opcionales en el gate.
 export const MessageEnvelopeSchema = z.object({
-  idpk: z.string().min(1),
-  msgId: z.string().min(1),
+  idpk: z.string().min(1).optional(),
+  msgId: z.string().min(1).optional(),
   type: z.string().min(1),
   cityId: z.string().min(1).optional(),
 });
 
+// Los tipos de mensaje que SÍ requieren idpk/msgId (package-transit, payment,
+// ack) los re-exigen aquí. `timestamp` se mantiene laxo: la central no garantiza
+// un ISO 8601 estricto.
 export const BaseMessageSchema = MessageEnvelopeSchema.extend({
-  timestamp: z.string().datetime(),
+  idpk: z.string().min(1),
+  msgId: z.string().min(1),
+  timestamp: z.string().min(1),
 });
 
 // La central envía el paquete bajo el campo `body`; nuestro modelo y los tests
@@ -44,7 +54,12 @@ export const DistanceTableEntrySchema = z.object({
   enabled: z.boolean(),
 });
 
+// RF06 — la tabla que envía la central llega SIN `idpk`/`msgId` (§6.2), así que
+// aquí son opcionales (a diferencia de package-transit/payment/ack). Solo se usan
+// para el ACK a un peer, donde caemos a '' si faltan.
 export const DistanceTableMessageSchema = BaseMessageSchema.extend({
+  idpk: z.string().min(1).optional(),
+  msgId: z.string().min(1).optional(),
   type: z.enum(['distance-table', 'cost-update']),
   data: z.object({
     distances: z.record(z.string(), DistanceTableEntrySchema),

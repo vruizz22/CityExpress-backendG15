@@ -80,8 +80,8 @@ export class RoutingSubscriberService implements OnModuleInit {
           await this.distanceTable.applyPeerTable(senderCityId, distances);
           await this.distanceTable.sendAck(
             senderCityId,
-            parsed.data.idpk,
-            parsed.data.msgId,
+            parsed.data.idpk ?? '',
+            parsed.data.msgId ?? '',
             'ack',
           );
         }
@@ -105,7 +105,12 @@ export class RoutingSubscriberService implements OnModuleInit {
   }
 
   /** Dedup por msgId con TTL para descartar reentregas y romper loops. */
-  private isDuplicate(msgId: string): boolean {
+  private isDuplicate(msgId: string | undefined): boolean {
+    // Sin msgId no podemos deduplicar (p. ej. tablas de la central que no lo
+    // envían): se procesa siempre en vez de descartarlo.
+    if (!msgId) {
+      return false;
+    }
     const now = Date.now();
     this.pruneSeen(now);
     if (this.seen.has(msgId)) {
