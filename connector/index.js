@@ -11,6 +11,19 @@ async function start() {
     const connection = await amqp.connect(RABBITMQ_URL);
     const channel = await connection.createChannel();
 
+    // En E2 el master (NestJS) consume el broker directamente (AMQP) y maneja
+    // todos los tipos: package-transit, distance-table, cost-update, etc. Si el
+    // connector tambien consume la misma cola, se reparte (round-robin) y ACKea
+    // los tipos que no maneja -> se traga la tabla de distancias y el master no
+    // la recibe. Por eso el connector queda deshabilitado salvo CONNECTOR_ENABLED=true.
+    if (process.env.CONNECTOR_ENABLED !== 'true') {
+      console.log(
+        '[*] Connector deshabilitado (el master consume el broker en E2). ' +
+          'Set CONNECTOR_ENABLED=true para reactivarlo.',
+      );
+      return; // mantiene la conexion abierta sin consumir
+    }
+
     // Asertar la cola por seguridad
     // await channel.assertQueue(RABBITMQ_QUEUE, { durable: true });
     console.log(`[*] Esperando eventos en la cola ${RABBITMQ_QUEUE}...`);
