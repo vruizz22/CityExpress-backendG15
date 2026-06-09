@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { CITY_CATALOG } from '@config/city.config';
 import { DistanceTableService } from '@/routing/distance-table.service';
 
 @Injectable()
@@ -13,12 +14,15 @@ export class RoutesService {
     enabled: boolean;
   }> {
     const snapshot = this.distanceTable.getSnapshot();
-    return Object.values(snapshot).map((entry) => ({
-      code: entry.destinationCode,
-      name: entry.destinationName,
-      distance: entry.distance,
-      transportCost: entry.transportCost,
-      enabled: entry.enabled,
-    }));
+    return CITY_CATALOG.map((city) => {
+      const entry = snapshot[city.code];
+      return {
+        code: city.code,
+        name: city.name,
+        distance: entry?.distance ?? 0,
+        transportCost: entry?.transportCost ?? 0,
+        enabled: entry?.enabled ?? false,
+      };
+    });
   }
 }
