@@ -54,17 +54,56 @@ export const DistanceTableEntrySchema = z.object({
   enabled: z.boolean(),
 });
 
-// RF06 — la tabla que envía la central llega SIN `idpk`/`msgId` (§6.2), así que
-// aquí son opcionales (a diferencia de package-transit/payment/ack). Solo se usan
-// para el ACK a un peer, donde caemos a '' si faltan.
-export const DistanceTableMessageSchema = BaseMessageSchema.extend({
-  idpk: z.string().min(1).optional(),
-  msgId: z.string().min(1).optional(),
-  type: z.enum(['distance-table', 'cost-update']),
-  data: z.object({
-    distances: z.record(z.string(), DistanceTableEntrySchema),
+// RF06 — la tabla de distancias. El central la manda en el formato real
+// `{ body: { cityCode, cityName, routes: [ ... ] } }` (array bajo `body`), NO
+// como `{ data: { distances: { ... } } }`. Igual que PackageTransitMessageSchema
+// hace con `body`→`packageBody`, normalizamos antes de validar:
+//   - body.routes[]  → data.distances{}  (keyed por destinationCode)
+//   - body.cityCode  → cityId            (el subscriber decide isOwnTable con él)
+// Si el mensaje ya viene como `data.distances` (peers de nuestro propio código,
+// o la forma documentada §6.2 sin idpk/msgId), pasa derecho. idpk/msgId son
+// opcionales: el central no siempre los envía.
+export const DistanceTableMessageSchema = z.preprocess(
+  (raw: unknown) => {
+    if (raw && typeof raw === 'object' && 'body' in raw && !('data' in raw)) {
+      const { body, ...rest } = raw as {
+        body: unknown;
+        [key: string]: unknown;
+      };
+      if (body && typeof body === 'object' && 'routes' in body) {
+        const b = body as { cityCode?: unknown; routes?: unknown };
+        const routes = Array.isArray(b.routes) ? b.routes : [];
+        const distances: Record<string, unknown> = {};
+        for (const entry of routes) {
+          if (
+            entry &&
+            typeof entry === 'object' &&
+            'destinationCode' in entry &&
+            typeof (entry as { destinationCode: unknown }).destinationCode ===
+              'string'
+          ) {
+            distances[(entry as { destinationCode: string }).destinationCode] =
+              entry;
+          }
+        }
+        return {
+          ...rest,
+          ...(typeof b.cityCode === 'string' ? { cityId: b.cityCode } : {}),
+          data: { distances },
+        };
+      }
+    }
+    return raw;
+  },
+  BaseMessageSchema.extend({
+    idpk: z.string().min(1).optional(),
+    msgId: z.string().min(1).optional(),
+    type: z.enum(['distance-table', 'cost-update']),
+    data: z.object({
+      distances: z.record(z.string(), DistanceTableEntrySchema),
+    }),
   }),
-});
+);
 
 // RF06 — request de tabla de distancias que envían otras ciudades a nuestra cola.
 export const DistanceTableRequestSchema = BaseMessageSchema.extend({
