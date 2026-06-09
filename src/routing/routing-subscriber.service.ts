@@ -47,6 +47,10 @@ export class RoutingSubscriberService implements OnModuleInit {
 
   // Dedup anti-loop: descarta mensajes ya procesados (reentregas del broker).
   private readonly seenTtlMs = Number(process.env.MSG_DEDUP_TTL_MS ?? 60000);
+  // Tope duro: si la tormenta entra más rápido que el TTL, el dedup por tiempo no
+  // alcanza a podar y el Map crecería sin límite (cada msgId es único) → fuga de
+  // memoria. Con el tope evictamos los más viejos (Map preserva orden de inserción).
+  private readonly seenMax = Number(process.env.MSG_DEDUP_MAX ?? 5000);
   private readonly seen = new Map<string, number>();
 
   constructor(
@@ -156,11 +160,20 @@ export class RoutingSubscriberService implements OnModuleInit {
   }
 
   private pruneSeen(now: number): void {
-    if (this.seen.size < 1000) {
-      return;
+    // 1) Poda por TTL (reentregas viejas).
+    if (this.seen.size >= 1000) {
+      for (const [id, ts] of this.seen) {
+        if (now - ts > this.seenTtlMs) {
+          this.seen.delete(id);
+        }
+      }
     }
-    for (const [id, ts] of this.seen) {
-      if (now - ts > this.seenTtlMs) {
+    // 2) Tope duro: si aún excede (tormenta más rápida que el TTL), evicta los
+    //    más antiguos hasta volver al máximo. Evita la fuga de memoria del Map.
+    if (this.seen.size > this.seenMax) {
+      let toEvict = this.seen.size - this.seenMax;
+      for (const id of this.seen.keys()) {
+        if (toEvict-- <= 0) break;
         this.seen.delete(id);
       }
     }
