@@ -30,7 +30,13 @@ import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.servi
     {
       provide: MESSAGE_BROKER,
       useFactory: async () => {
-        if (process.env.USE_AMQP === 'true') {
+        // Conecta al broker si hay RABBITMQ_URL configurado (USE_AMQP=false lo
+        // fuerza apagado). Antes exigía USE_AMQP=true explícito y en prod, si no
+        // estaba seteado, el backend nunca recibía la tabla de distancias.
+        const useAmqp =
+          process.env.USE_AMQP === 'true' ||
+          (!!process.env.RABBITMQ_URL && process.env.USE_AMQP !== 'false');
+        if (useAmqp) {
           const mod = await import('../messaging/amqp-message-broker.service');
           const { AmqpMessageBrokerService } = mod as any;
           return new AmqpMessageBrokerService();
