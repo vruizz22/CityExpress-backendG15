@@ -10,6 +10,7 @@ import {
   CITY_CODES,
   CITY_ID,
   cityRoutingKey,
+  sameCity,
 } from '@/config/city.config';
 import {
   AckMessage,
@@ -73,9 +74,17 @@ export class DistanceTableService implements OnModuleInit {
     const message: DistanceTableRequestMessage = {
       ...base,
       type: 'request',
-      source: CITY_ID,
+      // `source` en minúscula: la central responde a `city.<source>` y nuestra
+      // cola está bindeada en minúscula (`city.tk3`). Con mayúscula la respuesta
+      // se rutearía a `city.TK3` y se perdería.
+      source: CITY_ID.toLowerCase(),
       data: { ask: 'distance-table' },
     };
+    this.logger.log(
+      `Solicitando tabla inicial a la central (routingKey=${cityRoutingKey(
+        CENTRAL_ID,
+      )}, source=${message.source}).`,
+    );
     await this.broker.send(cityRoutingKey(CENTRAL_ID), message);
   }
 
@@ -101,7 +110,7 @@ export class DistanceTableService implements OnModuleInit {
       const message: DistanceTableRequestMessage = {
         ...base,
         type: 'request',
-        source: CITY_ID,
+        source: CITY_ID.toLowerCase(),
         data: { ask: 'distance-table' },
       };
       await this.broker.send(cityRoutingKey(code), message);
@@ -113,7 +122,7 @@ export class DistanceTableService implements OnModuleInit {
    * tabla vigente como cost-update a la cola de la ciudad solicitante.
    */
   async respondWithOwnTable(requesterCityId: string): Promise<void> {
-    if (!requesterCityId || requesterCityId === CITY_ID) {
+    if (!requesterCityId || sameCity(requesterCityId, CITY_ID)) {
       return;
     }
     const base = createBaseMessage('cost-update');
@@ -173,6 +182,14 @@ export class DistanceTableService implements OnModuleInit {
 
   updateDistances(distances: Record<string, DistanceTableEntry>): void {
     this.distances = new Map(Object.entries(distances));
+
+    const total = this.distances.size;
+    const enabled = Array.from(this.distances.values()).filter(
+      (e) => e.enabled,
+    ).length;
+    this.logger.log(
+      `Tabla de distancias actualizada: ${total} entradas (${enabled} habilitadas).`,
+    );
 
     // Cada vez que el broker nos mande distancias frescas, agendamos el cálculo
     // con debounce (agrupa ráfagas de cost-update en un solo recálculo).

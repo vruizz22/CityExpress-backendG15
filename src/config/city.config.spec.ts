@@ -1,8 +1,10 @@
 import {
   CITY_CATALOG,
   CITY_CODES,
+  cityRoutingKey,
   getCityName,
   getOwnCityId,
+  sameCity,
 } from '@config/city.config';
 
 describe('city.config', () => {
@@ -39,5 +41,19 @@ describe('city.config', () => {
   it('getOwnCityId returns the configured city when valid', () => {
     process.env.CITY_ID = 'COR';
     expect(getOwnCityId()).toBe('COR');
+  });
+
+  it('cityRoutingKey siempre emite en minúscula (binding del broker)', () => {
+    expect(cityRoutingKey('TK3')).toBe('city.tk3');
+    expect(cityRoutingKey('HGW')).toBe('city.hgw');
+    expect(cityRoutingKey('central')).toBe('city.central');
+  });
+
+  it('sameCity compara códigos sin importar la caja', () => {
+    expect(sameCity('TK3', 'tk3')).toBe(true);
+    expect(sameCity('hgw', 'HGW')).toBe(true);
+    expect(sameCity('TK3', 'HGW')).toBe(false);
+    expect(sameCity(undefined, 'TK3')).toBe(false);
+    expect(sameCity('TK3', null)).toBe(false);
   });
 });

@@ -34,8 +34,19 @@ export function getCityName(code: string): string | undefined {
 // Identidad central usada como origen de paquetes y destino de auditorías.
 export const CENTRAL_ID = 'central';
 
-// Routing key del broker para una ciudad dada.
-export const cityRoutingKey = (cityId: string) => `city.${cityId}`;
+// Routing key del broker para una ciudad dada. El broker usa claves en
+// MINÚSCULA (las colas se bindean como `city.<code>`, p. ej. `city.tk3.q` →
+// `city.tk3`) y las routing keys de topic son case-sensitive. Si emitimos
+// `city.TK3`, el mensaje no calza con ningún binding y se pierde (síntoma: la
+// tabla de distancias nunca llega y /routes muestra todo deshabilitado).
+export const cityRoutingKey = (cityId: string) =>
+  `city.${cityId.toLowerCase()}`;
+
+// Comparación de códigos de ciudad insensible a mayúsculas. La central/peers y
+// los paquetes pueden traer el código en distinta caja (p. ej. destinationId
+// "tk3" vs CITY_ID "TK3").
+export const sameCity = (a?: string | null, b?: string | null): boolean =>
+  !!a && !!b && a.toLowerCase() === b.toLowerCase();
 
 /**
  * Identificador de ciudad propio (lectura dinámica + validación estricta).

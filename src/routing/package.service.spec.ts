@@ -124,7 +124,7 @@ describe('PackageService', () => {
     const calls = broker.send.mock.calls as [string, { type?: string }][];
     const ackCall = calls.find(
       ([routingKey, payload]) =>
-        routingKey === 'city.RNC' && payload?.type === 'ack',
+        routingKey === 'city.rnc' && payload?.type === 'ack',
     );
     expect(ackCall).toBeDefined();
     expect(audit.reportTransit).not.toHaveBeenCalled();
@@ -179,7 +179,7 @@ describe('PackageService', () => {
 
     const directCall = broker.send.mock.calls.find(
       ([routingKey, payload]) =>
-        routingKey === 'city.HGW' &&
+        routingKey === 'city.hgw' &&
         (payload as PackageTransitMessage).type === 'package-transit',
     ) as [string, PackageTransitMessage] | undefined;
 
@@ -209,7 +209,7 @@ describe('PackageService', () => {
 
     const redirectCall = broker.send.mock.calls.find(
       ([routingKey, payload]) =>
-        routingKey === 'city.MET' &&
+        routingKey === 'city.met' &&
         (payload as PackageTransitMessage).type === 'package-transit',
     ) as [string, PackageTransitMessage] | undefined;
 
