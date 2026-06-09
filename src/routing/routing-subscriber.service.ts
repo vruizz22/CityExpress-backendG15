@@ -1,5 +1,10 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { CENTRAL_ID, CITY_ID, cityRoutingKey } from '@/config/city.config';
+import {
+  CENTRAL_ID,
+  CITY_ID,
+  cityRoutingKey,
+  sameCity,
+} from '@/config/city.config';
 import {
   MESSAGE_BROKER,
   MessageBrokerService,
@@ -69,8 +74,8 @@ export class RoutingSubscriberService implements OnModuleInit {
 
         const isOwnTable =
           !senderCityId ||
-          senderCityId === CITY_ID ||
-          senderCityId === CENTRAL_ID;
+          sameCity(senderCityId, CITY_ID) ||
+          sameCity(senderCityId, CENTRAL_ID);
 
         if (isOwnTable) {
           // Nuestra tabla (la manda la central) → aplicar + fanout a las demás.

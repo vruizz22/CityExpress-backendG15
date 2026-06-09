@@ -59,7 +59,7 @@ describe('DistanceTableService', () => {
     ];
     expect(routingKey).toBe('city.central');
     expect(payload.type).toBe('request');
-    expect(payload.source).toBe(CITY_ID);
+    expect(payload.source).toBe(CITY_ID.toLowerCase());
     expect(payload.data.ask).toBe('distance-table');
   });
 
@@ -120,9 +120,9 @@ describe('DistanceTableService', () => {
     ).length;
     expect(calls).toHaveLength(expected);
     for (const [routingKey, payload] of calls) {
-      expect(routingKey).not.toBe(`city.${CITY_ID}`);
+      expect(routingKey).not.toBe(`city.${CITY_ID.toLowerCase()}`);
       expect(payload.type).toBe('request');
-      expect(payload.source).toBe(CITY_ID);
+      expect(payload.source).toBe(CITY_ID.toLowerCase());
     }
   });
 
@@ -146,9 +146,9 @@ describe('DistanceTableService', () => {
     const calls = (broker.send as jest.Mock).mock.calls as Array<
       [string, { type: string; cityId?: string }]
     >;
-    expect(calls[0][0]).toBe('city.COR');
+    expect(calls[0][0]).toBe('city.cor');
     expect(calls[0][1].type).toBe('ack');
-    expect(calls[1][0]).toBe('city.COR');
+    expect(calls[1][0]).toBe('city.cor');
     expect(calls[1][1].type).toBe('cost-update');
     expect(calls[1][1].cityId).toBe(CITY_ID);
   });

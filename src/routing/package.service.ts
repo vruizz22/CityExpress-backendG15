@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CITY_ID, cityRoutingKey } from '@/config/city.config';
+import { CITY_ID, cityRoutingKey, sameCity } from '@/config/city.config';
 import {
   MESSAGE_BROKER,
   MessageBrokerService,
@@ -136,7 +136,7 @@ export class PackageService {
     }
 
     const pkg = normalizedPayload.packageBody;
-    if (pkg.destinationId === CITY_ID) {
+    if (sameCity(pkg.destinationId, CITY_ID)) {
       await this.processFinalDestination(pkg, normalizedPayload, now);
     } else {
       await this.processForwarding(pkg, normalizedPayload);
