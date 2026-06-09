@@ -9,8 +9,13 @@ describe('PendingPackagesRepository', () => {
     update: { type: string } & Record<string, unknown>;
   };
   type FindManyArgs = {
-    where: { type: string; deliverNotBefore?: { lte: Date } };
-    orderBy?: { deliverNotBefore: 'asc' };
+    where: {
+      type: string;
+      deliverNotBefore?: { lte: Date };
+      idpk?: { gt: string };
+    };
+    orderBy?: { deliverNotBefore?: 'asc'; idpk?: 'asc' };
+    take?: number;
   };
   type DeleteArgs = { where: { idpk: string } };
 
@@ -96,12 +101,24 @@ describe('PendingPackagesRepository', () => {
     expect(call.orderBy?.deliverNotBefore).toBe('asc');
   });
 
-  it('queries pending routes', async () => {
-    await repository.findPendingRoutes();
+  it('queries pending routes in bounded keyset batches', async () => {
+    await repository.findPendingRoutes(200);
 
     const call = prisma.packageEvent.findMany.mock.calls[0][0];
 
     expect(call.where.type).toBe('pending-route');
+    expect(call.where.idpk).toBeUndefined();
+    expect(call.orderBy?.idpk).toBe('asc');
+    expect(call.take).toBe(200);
+  });
+
+  it('paginates pending routes after a cursor idpk', async () => {
+    await repository.findPendingRoutes(50, 'idpk-cursor');
+
+    const call = prisma.packageEvent.findMany.mock.calls[0][0];
+
+    expect(call.where.idpk).toEqual({ gt: 'idpk-cursor' });
+    expect(call.take).toBe(50);
   });
 
   it('removes pending entries by idpk', async () => {
