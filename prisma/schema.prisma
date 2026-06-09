@@ -27,6 +27,10 @@ model PackageEvent {
 
   @@index([packageId, receivedAt])
   @@index([destinationId])
+  // Drenado de pendientes por tipo con keyset pagination (type + idpk): evita el
+  // seq scan de toda la tabla y permite paginar el backlog de 'pending-route'
+  // sin cargarlo entero a RAM (causa del OOM del master).
+  @@index([type, idpk])
 }
 
 model Route {
