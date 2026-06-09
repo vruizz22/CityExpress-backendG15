@@ -100,8 +100,8 @@ export class PackageService {
       }
       await this.sendAck(
         senderCityId,
-        envelope.data.idpk,
-        envelope.data.msgId,
+        envelope.data.idpk ?? '',
+        envelope.data.msgId ?? '',
         'nack',
       );
       return;
