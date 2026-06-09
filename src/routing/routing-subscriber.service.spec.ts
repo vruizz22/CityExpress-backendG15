@@ -64,6 +64,24 @@ describe('RoutingSubscriberService', () => {
     expect(packageService.processPendingRoutes).toHaveBeenCalledTimes(1);
   });
 
+  it('applies the central table even without idpk/msgId (real broker shape)', async () => {
+    // La central responde la tabla SIN idpk/msgId (docs/requirements.md §6.2).
+    // Antes el envelope se rechazaba y la tabla nunca se aplicaba: GET /routes
+    // devolvía todas las ciudades como enabled:false.
+    const { broker, distanceTable, packageService, service } = makeSubscriber();
+    await service.onModuleInit();
+    const handler = getHandler(broker);
+
+    await handler({
+      type: 'distance-table',
+      timestamp: '2026-04-29T00:00:00.000Z',
+      data: { distances },
+    });
+
+    expect(distanceTable.applyOwnTable).toHaveBeenCalledWith(distances);
+    expect(packageService.processPendingRoutes).toHaveBeenCalledTimes(1);
+  });
+
   it('stores a peer table and sends ACK back', async () => {
     const { broker, distanceTable, service } = makeSubscriber();
     await service.onModuleInit();
