@@ -27,6 +27,7 @@ import { createBaseMessage } from '@/messaging/message.factory';
 import { DistanceTableMessageSchema } from '@/messaging/message.schemas';
 import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
 import { ReceivedTableRepository } from '@/routing-calc/received-table.repository';
+import { RouteRepository } from '@/routing/route.repository';
 
 export interface ComputedRoute {
   nextHop: string | null;
@@ -76,6 +77,7 @@ export class DistanceTableService implements OnModuleInit {
     @Inject(forwardRef(() => RoutingOrchestratorService))
     private readonly routingOrchestrator: RoutingOrchestratorService,
     private readonly receivedTables: ReceivedTableRepository,
+    private readonly routeRepository: RouteRepository,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -225,6 +227,16 @@ export class DistanceTableService implements OnModuleInit {
     this.logger.log(
       `Tabla de distancias actualizada: ${total} entradas (${enabled} habilitadas).`,
     );
+
+    // Persistir en BD para que /routes sea consistente entre procesos y
+    // sobreviva reinicios (el snapshot en memoria es por-proceso). Fire-and-
+    // forget: no bloquea el flujo del broker; si falla, se reintenta al próximo
+    // cost-update.
+    void this.routeRepository.saveSnapshot(distances).catch((err: Error) => {
+      this.logger.error(
+        `No se pudo persistir la tabla de rutas en BD: ${err.message}`,
+      );
+    });
 
     // Cada vez que el broker nos mande distancias frescas, agendamos el cálculo
     // con debounce (agrupa ráfagas de cost-update en un solo recálculo).
