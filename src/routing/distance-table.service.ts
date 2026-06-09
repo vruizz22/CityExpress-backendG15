@@ -62,6 +62,15 @@ export class DistanceTableService implements OnModuleInit {
   );
   private lastInitialRequestAt = 0;
 
+  // Anti-tormenta: algunas ciudades (broker compartido) spammean `request`
+  // decenas de veces por segundo. Respondemos a cada requester como mucho una
+  // vez por ventana para no amplificar la tormenta (cada respuesta es nuestra
+  // tabla completa) ni saturar la RAM/CPU del EC2.
+  private readonly respondThrottleMs = Number(
+    process.env.TABLE_RESPOND_THROTTLE_MS ?? 5000,
+  );
+  private readonly lastRespondedAt = new Map<string, number>();
+
   constructor(
     @Inject(MESSAGE_BROKER) private readonly broker: MessageBrokerService,
     @Inject(forwardRef(() => RoutingOrchestratorService))
@@ -140,6 +149,17 @@ export class DistanceTableService implements OnModuleInit {
     if (!requesterCityId || sameCity(requesterCityId, CITY_ID)) {
       return;
     }
+
+    const key = requesterCityId.toLowerCase();
+    const now = Date.now();
+    if (now - (this.lastRespondedAt.get(key) ?? 0) < this.respondThrottleMs) {
+      this.logger.debug(
+        `Respuesta de tabla a ${requesterCityId} omitida por throttle.`,
+      );
+      return;
+    }
+    this.lastRespondedAt.set(key, now);
+
     const base = createBaseMessage('cost-update');
     await this.sendAck(requesterCityId, base.idpk, base.msgId, 'ack');
 
