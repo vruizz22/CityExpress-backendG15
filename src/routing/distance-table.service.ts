@@ -54,6 +54,14 @@ export class DistanceTableService implements OnModuleInit {
   );
   private lastFanoutAt = 0;
 
+  // Evita inundar la central con el request inicial cuando la conexión flapea
+  // (cada reconexión dispara onConnect). Permite reintentos espaciados para
+  // recuperarse si la primera respuesta nunca llega.
+  private readonly initialRequestThrottleMs = Number(
+    process.env.TABLE_REQUEST_THROTTLE_MS ?? 15000,
+  );
+  private lastInitialRequestAt = 0;
+
   constructor(
     @Inject(MESSAGE_BROKER) private readonly broker: MessageBrokerService,
     @Inject(forwardRef(() => RoutingOrchestratorService))
@@ -70,6 +78,13 @@ export class DistanceTableService implements OnModuleInit {
 
   /** Pide a la central nuestra tabla de distancias. RF06. */
   async requestInitialTable(): Promise<void> {
+    const now = Date.now();
+    if (now - this.lastInitialRequestAt < this.initialRequestThrottleMs) {
+      this.logger.debug('Request inicial de tabla omitido por throttle.');
+      return;
+    }
+    this.lastInitialRequestAt = now;
+
     const base = createBaseMessage('request');
     const message: DistanceTableRequestMessage = {
       ...base,
@@ -131,7 +146,7 @@ export class DistanceTableService implements OnModuleInit {
     const message: DistanceTableMessage = {
       ...base,
       type: 'cost-update',
-      cityId: CITY_ID,
+      cityId: CITY_ID.toLowerCase(),
       data: { distances: this.getSnapshot() },
     };
     await this.broker.send(cityRoutingKey(requesterCityId), message);

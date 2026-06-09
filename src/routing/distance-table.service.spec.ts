@@ -60,7 +60,17 @@ describe('DistanceTableService', () => {
     expect(routingKey).toBe('city.central');
     expect(payload.type).toBe('request');
     expect(payload.source).toBe(CITY_ID.toLowerCase());
+    expect(payload.cityId).toBe(CITY_ID.toLowerCase());
     expect(payload.data.ask).toBe('distance-table');
+  });
+
+  it('throttles repeated initial-table requests (anti-spam en reconexión)', async () => {
+    const { service, broker } = makeService();
+
+    await service.requestInitialTable();
+    await service.requestInitialTable(); // dentro de la ventana → omitido
+
+    expect((broker.send as jest.Mock).mock.calls).toHaveLength(1);
   });
 
   it('updates and queries direct routes', () => {
@@ -150,7 +160,7 @@ describe('DistanceTableService', () => {
     expect(calls[0][1].type).toBe('ack');
     expect(calls[1][0]).toBe('city.cor');
     expect(calls[1][1].type).toBe('cost-update');
-    expect(calls[1][1].cityId).toBe(CITY_ID);
+    expect(calls[1][1].cityId).toBe(CITY_ID.toLowerCase());
   });
 
   it('stores a peer table without fanning out', async () => {
