@@ -7,6 +7,7 @@ import {
 import { MessageBrokerService } from '@/messaging/message-broker.interface';
 import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
 import { ReceivedTableRepository } from '@/routing-calc/received-table.repository';
+import { RouteRepository } from '@/routing/route.repository';
 import { CENTRAL_ID, CITY_CODES, CITY_ID } from '@/config/city.config';
 
 const buildDistances = (): Record<string, DistanceTableEntry> => ({
@@ -39,12 +40,17 @@ function makeService() {
     upsertTable: jest.fn().mockResolvedValue(undefined),
     getAllTables: jest.fn().mockResolvedValue({}),
   } as unknown as ReceivedTableRepository;
+  const routeRepository = {
+    saveSnapshot: jest.fn().mockResolvedValue(undefined),
+    findAll: jest.fn().mockResolvedValue([]),
+  } as unknown as RouteRepository;
   const service = new DistanceTableService(
     broker,
     orchestrator,
     receivedTables,
+    routeRepository,
   );
-  return { service, broker, orchestrator, receivedTables };
+  return { service, broker, orchestrator, receivedTables, routeRepository };
 }
 
 describe('DistanceTableService', () => {
@@ -60,7 +66,17 @@ describe('DistanceTableService', () => {
     expect(routingKey).toBe('city.central');
     expect(payload.type).toBe('request');
     expect(payload.source).toBe(CITY_ID.toLowerCase());
+    expect(payload.cityId).toBe(CITY_ID.toLowerCase());
     expect(payload.data.ask).toBe('distance-table');
+  });
+
+  it('throttles repeated initial-table requests (anti-spam en reconexión)', async () => {
+    const { service, broker } = makeService();
+
+    await service.requestInitialTable();
+    await service.requestInitialTable(); // dentro de la ventana → omitido
+
+    expect((broker.send as jest.Mock).mock.calls).toHaveLength(1);
   });
 
   it('updates and queries direct routes', () => {
@@ -150,7 +166,30 @@ describe('DistanceTableService', () => {
     expect(calls[0][1].type).toBe('ack');
     expect(calls[1][0]).toBe('city.cor');
     expect(calls[1][1].type).toBe('cost-update');
-    expect(calls[1][1].cityId).toBe(CITY_ID);
+    expect(calls[1][1].cityId).toBe(CITY_ID.toLowerCase());
+  });
+
+  it('throttles repeated responses to the same requester (anti-tormenta)', async () => {
+    const { service, broker } = makeService();
+    service.updateDistances(buildDistances());
+
+    await service.respondWithOwnTable('COR');
+    await service.respondWithOwnTable('COR'); // dentro de la ventana → omitido
+    await service.respondWithOwnTable('cor'); // misma ciudad, otra caja → omitido
+
+    // Solo la primera respuesta: 1 ack + 1 cost-update = 2 envíos.
+    expect((broker.send as jest.Mock).mock.calls).toHaveLength(2);
+  });
+
+  it('responde a ciudades distintas aunque una esté throttled', async () => {
+    const { service, broker } = makeService();
+    service.updateDistances(buildDistances());
+
+    await service.respondWithOwnTable('COR');
+    await service.respondWithOwnTable('HGW');
+
+    // 2 requesters distintos → 2 ack + 2 cost-update = 4 envíos.
+    expect((broker.send as jest.Mock).mock.calls).toHaveLength(4);
   });
 
   it('stores a peer table without fanning out', async () => {

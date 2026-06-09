@@ -14,6 +14,10 @@ export const createBaseMessage = (type: string): BaseMessage => {
     msgId,
     type,
     timestamp: new Date().toISOString(),
-    cityId: CITY_ID,
+    // En minúscula: el broker rutea por `city.<code>` (binding `city.tk3`) y las
+    // routing keys son case-sensitive. Si la central/peers responden usando
+    // nuestro `cityId` como destino, en mayúscula ("TK3") la respuesta se
+    // perdería. Nuestras comparaciones internas usan `sameCity` (case-insensitive).
+    cityId: CITY_ID.toLowerCase(),
   };
 };

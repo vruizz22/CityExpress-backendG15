@@ -9,6 +9,7 @@ import { DistanceTableService } from '@/routing/distance-table.service';
 import { PackageEventsRepository } from '@/routing/package-events.repository';
 import { PackageService } from '@/routing/package.service';
 import { PendingPackagesRepository } from '@/routing/pending-packages.repository';
+import { RouteRepository } from '@/routing/route.repository';
 import {
   NoopPackageDeliveryService,
   PackageDeliveryService,
@@ -24,6 +25,7 @@ import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.servi
     AuditService,
     PackageEventsRepository,
     PendingPackagesRepository,
+    RouteRepository,
     PackageService,
     RoutingSubscriberService,
     RoutingOrchestratorService,
@@ -51,6 +53,7 @@ import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.servi
     DistanceTableService,
     AuditService,
     PackageEventsRepository,
+    RouteRepository,
     MESSAGE_BROKER,
   ],
 })

@@ -6,7 +6,7 @@ describe('createBaseMessage', () => {
     const message = createBaseMessage('test-type');
 
     expect(message.type).toBe('test-type');
-    expect(message.cityId).toBe(CITY_ID);
+    expect(message.cityId).toBe(CITY_ID.toLowerCase());
     expect(message.idpk).not.toBe(message.msgId);
     expect(typeof message.idpk).toBe('string');
     expect(typeof message.msgId).toBe('string');

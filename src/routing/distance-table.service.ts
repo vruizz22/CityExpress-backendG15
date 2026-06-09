@@ -27,6 +27,7 @@ import { createBaseMessage } from '@/messaging/message.factory';
 import { DistanceTableMessageSchema } from '@/messaging/message.schemas';
 import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.service';
 import { ReceivedTableRepository } from '@/routing-calc/received-table.repository';
+import { RouteRepository } from '@/routing/route.repository';
 
 export interface ComputedRoute {
   nextHop: string | null;
@@ -54,11 +55,29 @@ export class DistanceTableService implements OnModuleInit {
   );
   private lastFanoutAt = 0;
 
+  // Evita inundar la central con el request inicial cuando la conexión flapea
+  // (cada reconexión dispara onConnect). Permite reintentos espaciados para
+  // recuperarse si la primera respuesta nunca llega.
+  private readonly initialRequestThrottleMs = Number(
+    process.env.TABLE_REQUEST_THROTTLE_MS ?? 15000,
+  );
+  private lastInitialRequestAt = 0;
+
+  // Anti-tormenta: algunas ciudades (broker compartido) spammean `request`
+  // decenas de veces por segundo. Respondemos a cada requester como mucho una
+  // vez por ventana para no amplificar la tormenta (cada respuesta es nuestra
+  // tabla completa) ni saturar la RAM/CPU del EC2.
+  private readonly respondThrottleMs = Number(
+    process.env.TABLE_RESPOND_THROTTLE_MS ?? 5000,
+  );
+  private readonly lastRespondedAt = new Map<string, number>();
+
   constructor(
     @Inject(MESSAGE_BROKER) private readonly broker: MessageBrokerService,
     @Inject(forwardRef(() => RoutingOrchestratorService))
     private readonly routingOrchestrator: RoutingOrchestratorService,
     private readonly receivedTables: ReceivedTableRepository,
+    private readonly routeRepository: RouteRepository,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -70,6 +89,13 @@ export class DistanceTableService implements OnModuleInit {
 
   /** Pide a la central nuestra tabla de distancias. RF06. */
   async requestInitialTable(): Promise<void> {
+    const now = Date.now();
+    if (now - this.lastInitialRequestAt < this.initialRequestThrottleMs) {
+      this.logger.debug('Request inicial de tabla omitido por throttle.');
+      return;
+    }
+    this.lastInitialRequestAt = now;
+
     const base = createBaseMessage('request');
     const message: DistanceTableRequestMessage = {
       ...base,
@@ -125,13 +151,24 @@ export class DistanceTableService implements OnModuleInit {
     if (!requesterCityId || sameCity(requesterCityId, CITY_ID)) {
       return;
     }
+
+    const key = requesterCityId.toLowerCase();
+    const now = Date.now();
+    if (now - (this.lastRespondedAt.get(key) ?? 0) < this.respondThrottleMs) {
+      this.logger.debug(
+        `Respuesta de tabla a ${requesterCityId} omitida por throttle.`,
+      );
+      return;
+    }
+    this.lastRespondedAt.set(key, now);
+
     const base = createBaseMessage('cost-update');
     await this.sendAck(requesterCityId, base.idpk, base.msgId, 'ack');
 
     const message: DistanceTableMessage = {
       ...base,
       type: 'cost-update',
-      cityId: CITY_ID,
+      cityId: CITY_ID.toLowerCase(),
       data: { distances: this.getSnapshot() },
     };
     await this.broker.send(cityRoutingKey(requesterCityId), message);
@@ -190,6 +227,16 @@ export class DistanceTableService implements OnModuleInit {
     this.logger.log(
       `Tabla de distancias actualizada: ${total} entradas (${enabled} habilitadas).`,
     );
+
+    // Persistir en BD para que /routes sea consistente entre procesos y
+    // sobreviva reinicios (el snapshot en memoria es por-proceso). Fire-and-
+    // forget: no bloquea el flujo del broker; si falla, se reintenta al próximo
+    // cost-update.
+    void this.routeRepository.saveSnapshot(distances).catch((err: Error) => {
+      this.logger.error(
+        `No se pudo persistir la tabla de rutas en BD: ${err.message}`,
+      );
+    });
 
     // Cada vez que el broker nos mande distancias frescas, agendamos el cálculo
     // con debounce (agrupa ráfagas de cost-update en un solo recálculo).
