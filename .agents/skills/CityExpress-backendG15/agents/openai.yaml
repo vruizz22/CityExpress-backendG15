@@ -1,0 +1,6 @@
+interface:
+  display_name: "CityExpress BackendG15"
+  short_description: "Repo-specific patterns and workflows for CityExpress-backendG15"
+  default_prompt: "Use the CityExpress-backendG15 repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
