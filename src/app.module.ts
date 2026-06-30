@@ -10,6 +10,7 @@ import { RoutingCalcModule } from '@/routing-calc/routing-calc.module';
 import { ShipmentsModule } from '@/shipments/shipments.module';
 import { PaymentsModule } from '@/payments/payments.module';
 import { SubscriptionsModule } from '@/subscriptions/subscriptions.module';
+import { EventsModule } from '@/events/events.module';
 import { DevSeedModule } from '@/dev/dev-seed.module';
 
 @Module({
@@ -23,6 +24,7 @@ import { DevSeedModule } from '@/dev/dev-seed.module';
     ShipmentsModule,
     PaymentsModule,
     SubscriptionsModule,
+    EventsModule,
     DevSeedModule,
   ],
   controllers: [AppController],

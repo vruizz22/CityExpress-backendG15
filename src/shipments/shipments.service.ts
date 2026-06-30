@@ -18,12 +18,14 @@ import {
 } from '@dto/shipment.dto';
 import { RouteComputationService } from '@/routing-calc/route-computation.service';
 import { computeAmount, dimensionsValid, getFPrice } from '@/payments/pricing';
+import { EventsService } from '@/events/events.service';
 
 @Injectable()
 export class ShipmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly routeComputation: RouteComputationService,
+    private readonly events: EventsService,
   ) {}
 
   // RF02
@@ -118,6 +120,15 @@ export class ShipmentsService {
         routePath: quote.path as unknown as Prisma.InputJsonValue,
         status: 'pending-payment',
       },
+    });
+
+    // RF04
+    this.events.publish({
+      type: 'package-created',
+      packageId,
+      cityId: shipment.originId,
+      message: `Nuevo envío a ${shipment.destinationId}`,
+      data: { destinationId: shipment.destinationId, amount: shipment.amount },
     });
 
     return {
