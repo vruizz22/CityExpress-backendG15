@@ -34,3 +34,31 @@ export function computeAmount(input: PriceInput): number {
   const clamped = Math.max(MIN_AMOUNT, Math.min(MAX_AMOUNT, raw));
   return Math.round(clamped);
 }
+
+export type PriorityClass = 'low' | 'medium' | 'high';
+
+// RF03
+export const PRIORITY_FACTORS: Record<PriorityClass, number> = {
+  low: 0.5,
+  medium: 1,
+  high: 2.5,
+};
+
+// RF02
+export const INSURANCE_PREMIUM_RATE = 0.05;
+
+export function getPriorityFactor(priorityClass: string): number {
+  return PRIORITY_FACTORS[priorityClass as PriorityClass] ?? 1;
+}
+
+// RF01/RF02/RF03
+export function priceWithSurcharges(
+  baseAmount: number,
+  opts: { priorityClass: string; insured: boolean },
+): number {
+  const withPriority = baseAmount * getPriorityFactor(opts.priorityClass);
+  const withInsurance = opts.insured
+    ? withPriority * (1 + INSURANCE_PREMIUM_RATE)
+    : withPriority;
+  return Math.round(withInsurance);
+}
