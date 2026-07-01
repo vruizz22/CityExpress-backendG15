@@ -293,7 +293,7 @@ export class PaymentsService {
       destinationId: shipment.destinationId,
       metaContent: shipment.metaContent,
       isMetaEncrypted: false,
-      constraints: { criteria: shipment.criteria },
+      constraints: { criteria: shipment.criteria, insured: shipment.insured },
       priorityClass: shipment.priorityClass,
       payment: shipment.amount,
     };

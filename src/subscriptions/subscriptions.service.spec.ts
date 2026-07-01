@@ -87,7 +87,11 @@ const reachableQuote: QuoteResult = {
   nextHop: 'TAL',
   path: ['HGW', 'TAL', 'COR'],
   fPrice: 1,
+  baseAmount: 10000,
   amount: 10000,
+  priorityClass: 'medium',
+  priorityFactor: 1,
+  insured: false,
   reachable: true,
   maxHopsOk: true,
 };

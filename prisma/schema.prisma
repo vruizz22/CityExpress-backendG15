@@ -75,6 +75,7 @@ model UserShipment {
   maxHops          Int
   deliveryStrategy String    @default("random")
   priorityClass    String    @default("medium")
+  insured          Boolean   @default(false) // RF02
   deliverNotBefore DateTime?
   metaContent      String?
   // RF02/RF03
