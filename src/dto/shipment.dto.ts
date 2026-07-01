@@ -17,6 +17,8 @@ export const QuoteRequestSchema = z.object({
   depth: dimension,
   criteria: z.enum(['distance', 'price']),
   maxHops: z.number().int().positive(),
+  priorityClass: z.enum(['low', 'medium', 'high']).optional(), // RF03
+  insured: z.boolean().optional(), // RF02
 });
 
 export type QuoteRequest = z.infer<typeof QuoteRequestSchema>;
@@ -25,7 +27,6 @@ export const CreateShipmentRequestSchema = QuoteRequestSchema.extend({
   deliverNotBefore: z.string().datetime().nullable().optional(),
   metaContent: z.string().nullable().optional(),
   deliveryStrategy: z.string().min(1).optional(),
-  priorityClass: z.string().min(1).optional(),
 });
 
 export type CreateShipmentRequest = z.infer<typeof CreateShipmentRequestSchema>;
@@ -38,7 +39,11 @@ export interface QuoteResult {
   nextHop: string | null;
   path: string[];
   fPrice: number;
+  baseAmount: number;
   amount: number;
+  priorityClass: string; // RF03
+  priorityFactor: number; // RF03
+  insured: boolean; // RF02
   reachable: boolean;
   maxHopsOk: boolean;
 }

@@ -1,0 +1,2 @@
+-- RF02
+ALTER TABLE "UserShipment" ADD COLUMN "insured" BOOLEAN NOT NULL DEFAULT false;
