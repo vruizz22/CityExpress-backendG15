@@ -37,6 +37,12 @@ services:
       - AUTH0_DOMAIN=${AUTH0_DOMAIN:-frontendg15cityexpress.us.auth0.com}
       - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-https://api.andresitowan.com}
       - AUTH0_ROLES_CLAIM=${AUTH0_ROLES_CLAIM:-https://cityexpress/roles}
+      # RF01 (E3): motor de suscripciones. StartExecution usa las credenciales del
+      # instance profile de la EC2 (rol cityexpress-ec2-role, con states:StartExecution).
+      # El secreto guarda el /tick; el ARN lo produce el Terraform de infra.
+      - SUBSCRIPTIONS_STATE_MACHINE_ARN=${SUBSCRIPTIONS_STATE_MACHINE_ARN}
+      - SUBSCRIPTION_TICK_SECRET=${SUBSCRIPTION_TICK_SECRET}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
     depends_on:
       - db
       - job-master
