@@ -4,6 +4,7 @@ import { ShipmentsService } from '@/shipments/shipments.service';
 import { PrismaService } from '@/prisma.service';
 import { priceWithSurcharges } from '@/payments/pricing';
 import { QuoteResult } from '@dto/shipment.dto';
+import { SubscriptionTrigger } from './subscription-trigger.interface';
 
 interface Store {
   subscriptions: Map<string, Record<string, unknown>>;
@@ -101,11 +102,13 @@ function makeService(opts?: { quote?: Partial<QuoteResult>; store?: Store }) {
   const shipments = {
     quote: jest.fn().mockResolvedValue({ ...reachableQuote, ...opts?.quote }),
   };
+  const trigger = { start: jest.fn().mockResolvedValue('noop:arn') };
   const service = new SubscriptionsService(
     prisma as unknown as PrismaService,
     shipments as unknown as ShipmentsService,
+    trigger as unknown as SubscriptionTrigger,
   );
-  return { service, store, shipments };
+  return { service, store, shipments, trigger };
 }
 
 const baseInput = {
@@ -199,6 +202,16 @@ describe('SubscriptionsService.create (validación RF01)', () => {
     await expect(
       service.create('user-1', { ...baseInput, budget: 9999 }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('gatilla el trigger de Step Functions y guarda el executionArn', async () => {
+    const { service, trigger } = makeService();
+    const view = await service.create('user-1', baseInput);
+
+    expect(trigger.start).toHaveBeenCalledWith(
+      expect.objectContaining({ subscriptionId: view.id, amount: 5 }),
+    );
+    expect(view.sfnExecutionArn).toBe('noop:arn');
   });
 });
 

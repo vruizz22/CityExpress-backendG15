@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -15,6 +16,10 @@ import {
   CreateSubscriptionRequest,
   CreateSubscriptionSchema,
 } from '@dto/subscription.dto';
+import {
+  SUBSCRIPTION_TRIGGER,
+  SubscriptionTrigger,
+} from './subscription-trigger.interface';
 
 type SubscriptionRow = Prisma.SubscriptionGetPayload<object>;
 type SubscriptionShipmentRow = Prisma.SubscriptionShipmentGetPayload<object>;
@@ -40,6 +45,8 @@ export class SubscriptionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly shipments: ShipmentsService,
+    @Inject(SUBSCRIPTION_TRIGGER)
+    private readonly trigger: SubscriptionTrigger,
   ) {}
 
   // RF01
@@ -121,10 +128,22 @@ export class SubscriptionsService {
       return created;
     });
 
+    const executionArn = await this.trigger.start({
+      subscriptionId: sub.id,
+      periodSeconds: sub.periodSeconds,
+      amount: sub.amount,
+    });
+    const started = executionArn
+      ? await this.prisma.subscription.update({
+          where: { id: sub.id },
+          data: { sfnExecutionArn: executionArn },
+        })
+      : sub;
+
     this.logger.log(
-      `Suscripción creada ${sub.id} (owner=${ownerSubject}, amount=${sub.amount}, budget=${sub.budget}, precio/envío=${pricePerShipment}).`,
+      `Suscripción creada ${started.id} (owner=${ownerSubject}, amount=${started.amount}, budget=${started.budget}, precio/envío=${pricePerShipment}).`,
     );
-    return this.toView(sub);
+    return this.toView(started);
   }
 
   // RF01
@@ -300,6 +319,7 @@ export class SubscriptionsService {
       sentCount: s.sentCount,
       remaining: s.amount - s.sentCount,
       status: s.status,
+      sfnExecutionArn: s.sfnExecutionArn,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
       shipments: shipments?.map((ss) => ({

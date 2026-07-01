@@ -48,3 +48,10 @@ export const CreateSubscriptionSchema = z.object({
 export type CreateSubscriptionRequest = z.infer<
   typeof CreateSubscriptionSchema
 >;
+
+// RF01
+export const TickRequestSchema = z.object({
+  tickNumber: z.number().int().min(0),
+});
+
+export type TickRequest = z.infer<typeof TickRequestSchema>;
