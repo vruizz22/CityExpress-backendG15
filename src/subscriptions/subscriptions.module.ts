@@ -7,10 +7,8 @@ import { SubscriptionsService } from './subscriptions.service';
 import { SubscriptionEngineService } from './subscription-engine.service';
 import { SubscriptionTickController } from './subscription-tick.controller';
 import { SubscriptionTickGuard } from './subscription-tick.guard';
-import {
-  SUBSCRIPTION_TRIGGER,
-  NoopSubscriptionTrigger,
-} from './subscription-trigger.interface';
+import { SUBSCRIPTION_TRIGGER } from './subscription-trigger.interface';
+import { SfnSubscriptionTrigger } from './sfn-subscription-trigger';
 
 // RF01
 @Module({
@@ -21,7 +19,7 @@ import {
     SubscriptionsService,
     SubscriptionEngineService,
     SubscriptionTickGuard,
-    { provide: SUBSCRIPTION_TRIGGER, useClass: NoopSubscriptionTrigger },
+    { provide: SUBSCRIPTION_TRIGGER, useClass: SfnSubscriptionTrigger },
   ],
   exports: [SubscriptionsService, SubscriptionEngineService],
 })
