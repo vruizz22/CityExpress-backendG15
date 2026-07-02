@@ -81,6 +81,22 @@ describe('AmqpMessageBrokerService', () => {
         { persistent: true },
       );
     });
+
+    // RF03 — prioridad AMQP por mensaje (priority queues de RabbitMQ).
+    it('publishes with AMQP priority when options.priority is set', () => {
+      const service = new AmqpMessageBrokerService();
+      const ch = mockChannel();
+      internals(service).channel = ch;
+
+      void service.send('city.HGW', baseAck, { priority: 3 });
+
+      expect(ch.publish).toHaveBeenCalledWith(
+        'fulfillment.x',
+        'city.HGW',
+        expect.any(Buffer),
+        { persistent: true, priority: 3 },
+      );
+    });
   });
 
   describe('startConsuming() via subscribe()', () => {
@@ -198,6 +214,26 @@ describe('AmqpMessageBrokerService', () => {
         { persistent: true },
       );
       expect(internals(service).pendingMessages).toHaveLength(0);
+    });
+
+    // RF03 — el buffer offline preserva la prioridad al reconectar.
+    it('preserves AMQP priority for messages buffered while offline', () => {
+      const service = new AmqpMessageBrokerService();
+      jest
+        .spyOn(internals(service).logger, 'warn')
+        .mockImplementation(() => {});
+      void service.send('city.central', baseAck, { priority: 1 });
+
+      const ch = mockChannel();
+      internals(service).channel = ch;
+      internals(service).flushPendingMessages();
+
+      expect(ch.publish).toHaveBeenCalledWith(
+        'fulfillment.x',
+        'city.central',
+        expect.any(Buffer),
+        { persistent: true, priority: 1 },
+      );
     });
   });
 });

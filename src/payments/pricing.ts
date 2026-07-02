@@ -44,11 +44,24 @@ export const PRIORITY_FACTORS: Record<PriorityClass, number> = {
   high: 2.5,
 };
 
+// RF03 — niveles AMQP para el sistema de prioridades de cola de RabbitMQ
+// (enunciado E3: low=1, medium=2, high=3).
+export const PRIORITY_LEVELS: Record<PriorityClass, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+};
+
 // RF02
 export const INSURANCE_PREMIUM_RATE = 0.05;
 
 export function getPriorityFactor(priorityClass: string): number {
   return PRIORITY_FACTORS[priorityClass as PriorityClass] ?? 1;
+}
+
+// RF03 — priorityClass desconocido cae a 'medium' (2), igual que el factor.
+export function getPriorityLevel(priorityClass: string): number {
+  return PRIORITY_LEVELS[priorityClass as PriorityClass] ?? 2;
 }
 
 // RF01/RF02/RF03
