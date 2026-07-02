@@ -17,13 +17,21 @@ import {
   QuoteResult,
 } from '@dto/shipment.dto';
 import { RouteComputationService } from '@/routing-calc/route-computation.service';
-import { computeAmount, dimensionsValid, getFPrice } from '@/payments/pricing';
+import {
+  computeAmount,
+  dimensionsValid,
+  getFPrice,
+  getPriorityFactor,
+  priceWithSurcharges,
+} from '@/payments/pricing';
+import { EventsService } from '@/events/events.service';
 
 @Injectable()
 export class ShipmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly routeComputation: RouteComputationService,
+    private readonly events: EventsService,
   ) {}
 
   // RF02
@@ -47,7 +55,9 @@ export class ShipmentsService {
     const reachable = route.reachable;
     const routeMetricCost = reachable ? route.cost : 0;
     const maxHopsOk = reachable && data.maxHops >= route.hops;
-    const amount =
+    const priorityClass = data.priorityClass ?? 'medium';
+    const insured = data.insured ?? false;
+    const baseAmount =
       reachable && maxHopsOk
         ? computeAmount({
             height: data.height,
@@ -56,6 +66,11 @@ export class ShipmentsService {
             routeMetricCost,
             fPrice,
           })
+        : 0;
+    // RF02/RF03
+    const amount =
+      baseAmount > 0
+        ? priceWithSurcharges(baseAmount, { priorityClass, insured })
         : 0;
 
     return {
@@ -66,7 +81,11 @@ export class ShipmentsService {
       nextHop: route.nextHop,
       path: route.path,
       fPrice,
+      baseAmount,
       amount,
+      priorityClass,
+      priorityFactor: getPriorityFactor(priorityClass),
+      insured,
       reachable,
       maxHopsOk,
     };
@@ -106,6 +125,7 @@ export class ShipmentsService {
         maxHops: data.maxHops,
         deliveryStrategy: data.deliveryStrategy ?? 'random',
         priorityClass: data.priorityClass ?? 'medium',
+        insured: data.insured ?? false,
         deliverNotBefore: data.deliverNotBefore
           ? new Date(data.deliverNotBefore)
           : null,
@@ -118,6 +138,15 @@ export class ShipmentsService {
         routePath: quote.path as unknown as Prisma.InputJsonValue,
         status: 'pending-payment',
       },
+    });
+
+    // RF04
+    this.events.publish({
+      type: 'package-created',
+      packageId,
+      cityId: shipment.originId,
+      message: `Nuevo envío a ${shipment.destinationId}`,
+      data: { destinationId: shipment.destinationId, amount: shipment.amount },
     });
 
     return {

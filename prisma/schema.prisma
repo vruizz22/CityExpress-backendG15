@@ -75,6 +75,7 @@ model UserShipment {
   maxHops          Int
   deliveryStrategy String    @default("random")
   priorityClass    String    @default("medium")
+  insured          Boolean   @default(false) // RF02
   deliverNotBefore DateTime?
   metaContent      String?
   // RF02/RF03
@@ -144,4 +145,68 @@ model CalculatedRoute {
   updatedAt       DateTime @updatedAt
 
   @@unique([destinationCode, criteria])
+}
+
+// RF01
+model Subscription {
+  id               String   @id @default(uuid())
+  ownerSubject     String
+  originId         String
+  destinationId    String
+  height           Int
+  width            Int
+  depth            Int
+  criteria         String   @default("distance")
+  maxHops          Int
+  deliveryStrategy String   @default("random")
+  priorityClass    String   @default("medium") // RF03
+  insured          Boolean  @default(false) // RF02
+  metaContent      String?
+  periodSeconds    Int
+  amount           Int
+  budget           Int
+  pricePerShipment Int
+  budgetSpent      Int      @default(0)
+  sentCount        Int      @default(0)
+  status           String   @default("active")
+  sfnExecutionArn  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  shipments SubscriptionShipment[]
+  ledger    BudgetLedgerEntry[]
+
+  @@index([ownerSubject, createdAt])
+  @@index([status])
+}
+
+// RF01
+model SubscriptionShipment {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  idempotencyKey String       @unique
+  tickNumber     Int
+  packageId      String?
+  userShipmentId String?
+  cost           Int          @default(0)
+  status         String       @default("triggered")
+  reason         String?
+  createdAt      DateTime     @default(now())
+
+  @@index([subscriptionId, tickNumber])
+}
+
+// RF01
+model BudgetLedgerEntry {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  delta          Int
+  balanceAfter   Int
+  reason         String
+  refId          String?
+  createdAt      DateTime     @default(now())
+
+  @@index([subscriptionId, createdAt])
 }
