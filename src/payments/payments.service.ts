@@ -291,7 +291,15 @@ export class PaymentsService {
         : null,
       originId: shipment.originId,
       destinationId: shipment.destinationId,
-      metaContent: shipment.metaContent,
+      // RF02 (E3): el enunciado exige insured como objeto en metaContent; la
+      // nota del usuario se conserva bajo `note`. constraints.insured queda por
+      // retro-compat con los flujos internos ya mergeados.
+      metaContent: shipment.insured
+        ? {
+            insured: true,
+            ...(shipment.metaContent ? { note: shipment.metaContent } : {}),
+          }
+        : shipment.metaContent,
       isMetaEncrypted: false,
       constraints: { criteria: shipment.criteria, insured: shipment.insured },
       priorityClass: shipment.priorityClass,

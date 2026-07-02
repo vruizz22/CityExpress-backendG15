@@ -26,7 +26,13 @@ export const buildPackageEventData = ({
       : null,
     originId: packageBody.originId,
     destinationId: packageBody.destinationId,
-    metaContent: packageBody.metaContent ?? null,
+    // RF02 (E3): metaContent puede llegar como objeto ({"insured": true}); la
+    // columna es String? → se serializa (toPackageBody lo normaliza de vuelta).
+    metaContent:
+      packageBody.metaContent !== null &&
+      typeof packageBody.metaContent === 'object'
+        ? JSON.stringify(packageBody.metaContent)
+        : (packageBody.metaContent ?? null),
     isMetaEncrypted: packageBody.isMetaEncrypted,
     constraints: (packageBody.constraints ?? {}) as Prisma.InputJsonValue,
     priorityClass: packageBody.priorityClass,

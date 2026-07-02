@@ -58,7 +58,14 @@ export class SubscriptionEngineService {
       deliverNotBefore: null,
       originId: sub.originId,
       destinationId: sub.destinationId,
-      metaContent: sub.metaContent,
+      // RF02 (E3): insured como objeto en metaContent (enunciado); la nota se
+      // conserva bajo `note`. constraints.insured queda por retro-compat.
+      metaContent: sub.insured
+        ? {
+            insured: true,
+            ...(sub.metaContent ? { note: sub.metaContent } : {}),
+          }
+        : sub.metaContent,
       isMetaEncrypted: false,
       constraints: { criteria: sub.criteria, insured: sub.insured },
       priorityClass: sub.priorityClass,

@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PackageService } from '@/routing/package.service';
 import { MESSAGE_BROKER } from '@/messaging/message-broker.interface';
+import { EventsService } from '@/events/events.service';
 import { AuditService } from '@/routing/audit.service';
 import { DistanceTableService } from '@/routing/distance-table.service';
+import { InsuranceService } from '@/routing/insurance.service';
 import { PackageEventsRepository } from '@/routing/package-events.repository';
 import { PendingPackagesRepository } from '@/routing/pending-packages.repository';
 import { PackageDeliveryService } from '@/routing/package-delivery.service';
@@ -31,6 +33,8 @@ describe('PackageService', () => {
     removePending: jest.Mock;
   };
   let delivery: { deliver: jest.Mock };
+  let insurance: { handleUndeliverable: jest.Mock };
+  let events: { publish: jest.Mock };
 
   const baseMessage = (
     overrides?: Partial<PackageTransitMessage>,
@@ -81,6 +85,8 @@ describe('PackageService', () => {
       removePending: jest.fn(),
     };
     delivery = { deliver: jest.fn() };
+    insurance = { handleUndeliverable: jest.fn().mockResolvedValue(undefined) };
+    events = { publish: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -91,6 +97,8 @@ describe('PackageService', () => {
         { provide: PackageEventsRepository, useValue: packageEvents },
         { provide: PendingPackagesRepository, useValue: pending },
         { provide: PackageDeliveryService, useValue: delivery },
+        { provide: InsuranceService, useValue: insurance },
+        { provide: EventsService, useValue: events },
       ],
     }).compile();
 
@@ -162,6 +170,84 @@ describe('PackageService', () => {
 
     expect(audit.reportExpired).toHaveBeenCalledWith('pkg-1');
     expect(pending.savePendingRoute).not.toHaveBeenCalled();
+  });
+
+  // RF02 (E3) — un asegurado que muere en nuestra ciudad gatilla el flujo de seguro.
+  it('notifies the insurance flow when an insured package expires', async () => {
+    const message = baseMessage({
+      packageBody: {
+        ...baseMessage().packageBody,
+        destinationId: 'HGW',
+        maxHops: 0,
+        metaContent: { insured: true },
+      },
+    });
+
+    await service.handlePackageTransit(message, new Date());
+
+    expect(audit.reportExpired).toHaveBeenCalledWith('pkg-1');
+    expect(insurance.handleUndeliverable).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'pkg-1', metaContent: { insured: true } }),
+      'max hops exceeded',
+    );
+  });
+
+  // Regresión G1 (E3): metaContent objeto (enunciado) debe pasar el schema, no NACKear.
+  it('accepts package-transit with object metaContent (E3 insured format)', async () => {
+    const message = baseMessage({
+      packageBody: {
+        ...baseMessage().packageBody,
+        destinationId: 'TK3',
+        metaContent: { insured: true },
+        deliverNotBefore: null,
+      },
+    });
+
+    await service.handlePackageTransit(message, new Date());
+
+    const calls = broker.send.mock.calls as [string, { type?: string }][];
+    const ackCall = calls.find(([, payload]) => payload?.type === 'ack');
+    const nackCall = calls.find(([, payload]) => payload?.type === 'nack');
+    expect(ackCall).toBeDefined();
+    expect(nackCall).toBeUndefined();
+    expect(delivery.deliver).toHaveBeenCalled();
+  });
+
+  // RF04 — feed en vivo: recepción y redirección se publican al SSE.
+  it('publishes package-received and package-redirected feed events', async () => {
+    distanceTable.getNextHop.mockReturnValue('MET');
+    const message = baseMessage({
+      packageBody: {
+        ...baseMessage().packageBody,
+        destinationId: 'HGW',
+        maxHops: 3,
+      },
+    });
+
+    await service.handlePackageTransit(message, new Date());
+
+    expect(events.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'package-received',
+        packageId: 'pkg-1',
+        origin: 'RNC',
+      }),
+    );
+    expect(events.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'package-redirected',
+        packageId: 'pkg-1',
+        destination: 'MET',
+      }),
+    );
+  });
+
+  it('does not publish feed events for duplicate deliveries (idempotencia)', async () => {
+    packageEvents.recordInbound.mockResolvedValue('duplicate');
+
+    await service.handlePackageTransit(baseMessage(), new Date());
+
+    expect(events.publish).not.toHaveBeenCalled();
   });
 
   it('routes directly when a direct route exists', async () => {
@@ -380,6 +466,8 @@ describe('PackageService', () => {
           { provide: PackageEventsRepository, useValue: packageEvents },
           { provide: PendingPackagesRepository, useValue: pending },
           { provide: PackageDeliveryService, useValue: delivery },
+          { provide: InsuranceService, useValue: insurance },
+          { provide: EventsService, useValue: events },
         ],
       }).compile();
       const batchedService = module.get<PackageService>(PackageService);

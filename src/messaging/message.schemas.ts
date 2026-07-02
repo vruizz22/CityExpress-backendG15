@@ -118,6 +118,18 @@ export const AckMessageSchema = BaseMessageSchema.extend({
   type: z.enum(['ack', 'nack']),
 });
 
+// RF02 (E3) — notificación ciudad tenedora → ciudad ORIGEN de que un paquete
+// asegurado no pudo entregarse. Laxo como el resto: `status` como string (solo
+// actuamos sobre 'expired') y `reason` opcional por si otros grupos lo omiten.
+export const PackageStatusMessageSchema = BaseMessageSchema.extend({
+  type: z.literal('package-status'),
+  data: z.object({
+    pkgId: z.string().min(1),
+    status: z.string().min(1),
+    reason: z.string().optional(),
+  }),
+});
+
 export const PaymentStatusMessageSchema = BaseMessageSchema.extend({
   type: z.literal('payment-status'),
   pkgId: z.string().min(1),

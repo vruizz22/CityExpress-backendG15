@@ -56,6 +56,17 @@ export interface AckMessage extends BaseMessage {
   type: 'ack' | 'nack';
 }
 
+// RF02 (E3) — la ciudad que no puede entregar un paquete ASEGURADO notifica a
+// la ciudad de ORIGEN para que gatille el cobro del seguro.
+export interface PackageStatusMessage extends BaseMessage {
+  type: 'package-status';
+  data: {
+    pkgId: string;
+    status: 'expired';
+    reason: string;
+  };
+}
+
 export type PaymentStatus = 'TRYING' | 'SUCCESS' | 'FAILED';
 
 export interface PaymentStatusData {
