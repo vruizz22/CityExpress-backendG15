@@ -1,0 +1,22 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Variables con posibles secretos — NO subir (sanción del enunciado)
+*.tfvars
+*.tfvars.json
+!example.tfvars
+
+# Overrides locales
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Artefacto de build de la Dispatcher Lambda (se genera con `npm run build:dispatch`)
+subscriptions/dist/
+subscriptions/dispatcher.zip
