@@ -3,16 +3,22 @@ export type FeedEventType =
   | 'package-created'
   | 'package-received'
   | 'package-redirected'
-  | 'insurance-charged';
+  | 'insurance-charged'
+  | 'package-status';
 
 // RF04
 export interface FeedEvent {
   type: FeedEventType;
-  at: string;
+  timestamp: string;
   packageId?: string;
-  cityId?: string;
+  status?: string;
+  reason?: string;
+  origin?: string;
+  destination?: string;
+  amount?: number;
   message?: string;
-  data?: Record<string, unknown>;
 }
 
-export type FeedEventInput = Omit<FeedEvent, 'at'> & { at?: string };
+export type FeedEventInput = Omit<FeedEvent, 'timestamp'> & {
+  timestamp?: string;
+};
