@@ -56,7 +56,7 @@ run_case() {
   for _ in $(seq 1 25); do
     status=$(aws stepfunctions describe-execution --endpoint-url "$ENDPOINT" \
       --execution-arn "$exec_arn" --query status --output text)
-    [ "$status" != "RUNNING" ] && break
+    [[ "$status" != "RUNNING" ]] && break
     sleep 1
   done
 
