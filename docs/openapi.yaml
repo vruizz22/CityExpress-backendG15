@@ -1,0 +1,710 @@
+# RDOC02
+openapi: 3.0.3
+info:
+  title: CityExpress API
+  version: "3.0.0"
+  description: Endpoints del backend de CityExpress expuestos al frontend (E3).
+
+servers:
+  - url: http://localhost:3000
+    description: Local
+  - url: https://{host}
+    description: Producción
+    variables:
+      host:
+        default: api.andresitowan.com
+
+tags:
+  - name: quotes
+  - name: shipments
+  - name: payments
+  - name: subscriptions
+  - name: events
+
+security:
+  - bearerAuth: []
+
+paths:
+  /quotes:
+    post:
+      tags: [quotes]
+      summary: Cotiza un envío (RF02/RF03)
+      description: amount incluye prioridad (RF03) y seguro 5% (RF02); baseAmount es sin recargos.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteRequest"
+      responses:
+        "200":
+          description: Cotización
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /shipments:
+    post:
+      tags: [shipments]
+      summary: Crea un envío (RF01)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateShipmentRequest"
+      responses:
+        "201":
+          description: Envío creado (queda pending-payment)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateShipmentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    get:
+      tags: [shipments]
+      summary: Lista los envíos del usuario (RF05)
+      parameters:
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Lista paginada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Paginated"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ShipmentView"
+
+  /shipments/{id}:
+    get:
+      tags: [shipments]
+      summary: Detalle de un envío
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Envío
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShipmentView"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /payments:
+    post:
+      tags: [payments]
+      summary: Inicia el pago Webpay de un envío (RF03)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InitPaymentRequest"
+      responses:
+        "201":
+          description: Transacción creada; redirigir al usuario a `redirectUrl`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /payments/commit:
+    post:
+      tags: [payments]
+      summary: Confirma el pago tras el retorno de Webpay (RF03)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommitPaymentRequest"
+      responses:
+        "200":
+          description: Resultado del pago
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /payments/{id}:
+    get:
+      tags: [payments]
+      summary: Estado de un pago
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Pago
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /subscriptions:
+    post:
+      tags: [subscriptions]
+      summary: Crea una suscripción de envíos periódicos (RF01)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubscriptionRequest"
+      responses:
+        "201":
+          description: Suscripción creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionView"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    get:
+      tags: [subscriptions]
+      summary: Lista las suscripciones del usuario
+      parameters:
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Lista paginada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Paginated"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/SubscriptionView"
+
+  /subscriptions/{id}:
+    get:
+      tags: [subscriptions]
+      summary: Detalle de una suscripción con sus envíos generados y el ledger
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Suscripción con `shipments[]` y `ledger[]`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /events/stream:
+    get:
+      tags: [events]
+      summary: Feed general de eventos por SSE (RF04)
+      description: SSE sin auth. El data de cada mensaje es un FeedEvent JSON.
+      security: []
+      responses:
+        "200":
+          description: Stream de eventos
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/FeedEvent"
+
+  /events/recent:
+    get:
+      tags: [events]
+      summary: Últimos eventos del feed (carga inicial)
+      security: []
+      responses:
+        "200":
+          description: Lista de eventos recientes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FeedEvent"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 25
+
+  responses:
+    BadRequest:
+      description: Datos inválidos
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: No autorizado a ver el recurso
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    CityCode:
+      type: string
+      description: Código de ciudad del catálogo (ej. HGW, COR, TAL)
+      example: COR
+
+    PriorityClass:
+      type: string
+      enum: [low, medium, high]
+      description: Prioridad; factor 0.5/1/2.5 (RF03).
+
+    Criteria:
+      type: string
+      enum: [distance, price]
+
+    QuoteRequest:
+      type: object
+      required: [destinationId, height, width, depth, criteria, maxHops]
+      properties:
+        destinationId:
+          $ref: "#/components/schemas/CityCode"
+        height:
+          type: integer
+          minimum: 1
+        width:
+          type: integer
+          minimum: 1
+        depth:
+          type: integer
+          minimum: 1
+        criteria:
+          $ref: "#/components/schemas/Criteria"
+        maxHops:
+          type: integer
+          minimum: 1
+        priorityClass:
+          $ref: "#/components/schemas/PriorityClass"
+        insured:
+          type: boolean
+          default: false
+          description: Seguro; prima 5% (RF02).
+      description: h+w+d debe ser > 0 y <= 3000 cm.
+
+    QuoteResult:
+      type: object
+      properties:
+        destinationId:
+          $ref: "#/components/schemas/CityCode"
+        criteria:
+          $ref: "#/components/schemas/Criteria"
+        routeMetricCost:
+          type: number
+        hops:
+          type: integer
+        nextHop:
+          type: string
+          nullable: true
+        path:
+          type: array
+          items:
+            type: string
+        fPrice:
+          type: number
+        baseAmount:
+          type: integer
+          description: Precio sin recargos.
+        amount:
+          type: integer
+          description: Precio final con prioridad y seguro aplicados.
+        priorityClass:
+          $ref: "#/components/schemas/PriorityClass"
+        priorityFactor:
+          type: number
+          example: 2.5
+        insured:
+          type: boolean
+        reachable:
+          type: boolean
+        maxHopsOk:
+          type: boolean
+
+    CreateShipmentRequest:
+      allOf:
+        - $ref: "#/components/schemas/QuoteRequest"
+        - type: object
+          properties:
+            deliverNotBefore:
+              type: string
+              format: date-time
+              nullable: true
+            metaContent:
+              type: string
+              nullable: true
+            deliveryStrategy:
+              type: string
+
+    CreateShipmentResponse:
+      type: object
+      properties:
+        shipmentId:
+          type: string
+        packageId:
+          type: string
+        amount:
+          type: integer
+        quote:
+          $ref: "#/components/schemas/QuoteResult"
+
+    ShipmentView:
+      type: object
+      properties:
+        id:
+          type: string
+        packageId:
+          type: string
+        originId:
+          $ref: "#/components/schemas/CityCode"
+        destinationId:
+          $ref: "#/components/schemas/CityCode"
+        criteria:
+          $ref: "#/components/schemas/Criteria"
+        amount:
+          type: integer
+        hops:
+          type: integer
+        nextHop:
+          type: string
+          nullable: true
+        routeMetricCost:
+          type: number
+        routePath:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          description: pending-payment | paid | sent | pending-routing | failed
+        createdAt:
+          type: string
+          format: date-time
+        payment:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Payment"
+
+    InitPaymentRequest:
+      type: object
+      required: [shipmentId]
+      properties:
+        shipmentId:
+          type: string
+        returnUrl:
+          type: string
+          format: uri
+
+    CommitPaymentRequest:
+      type: object
+      description: Token de Webpay (cualquiera de los tres).
+      properties:
+        token_ws:
+          type: string
+        ws_token:
+          type: string
+        TBK_TOKEN:
+          type: string
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+        shipmentId:
+          type: string
+        status:
+          type: string
+          description: TRYING | SUCCESS | FAILED
+        amount:
+          type: integer
+        currency:
+          type: string
+          default: CLP
+        redirectUrl:
+          type: string
+          nullable: true
+        authorizationCode:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+        transactionDate:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateSubscriptionRequest:
+      type: object
+      required: [destinationId, height, width, depth, maxHops, periodSeconds, amount, budget]
+      properties:
+        destinationId:
+          $ref: "#/components/schemas/CityCode"
+        height:
+          type: integer
+          minimum: 1
+        width:
+          type: integer
+          minimum: 1
+        depth:
+          type: integer
+          minimum: 1
+        criteria:
+          $ref: "#/components/schemas/Criteria"
+        maxHops:
+          type: integer
+          minimum: 1
+        deliveryStrategy:
+          type: string
+        priorityClass:
+          $ref: "#/components/schemas/PriorityClass"
+        insured:
+          type: boolean
+          default: false
+        metaContent:
+          type: string
+          nullable: true
+        periodSeconds:
+          type: integer
+          minimum: 60
+          maximum: 172800
+          description: Periodicidad, de 1 minuto (60) a 2 días (172800).
+        amount:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Cantidad total de envíos a generar.
+        budget:
+          type: integer
+          minimum: 1
+          description: Budget prepago total.
+
+    SubscriptionView:
+      type: object
+      properties:
+        id:
+          type: string
+        ownerSubject:
+          type: string
+        originId:
+          $ref: "#/components/schemas/CityCode"
+        destinationId:
+          $ref: "#/components/schemas/CityCode"
+        height:
+          type: integer
+        width:
+          type: integer
+        depth:
+          type: integer
+        criteria:
+          $ref: "#/components/schemas/Criteria"
+        maxHops:
+          type: integer
+        deliveryStrategy:
+          type: string
+        priorityClass:
+          $ref: "#/components/schemas/PriorityClass"
+        insured:
+          type: boolean
+        metaContent:
+          type: string
+          nullable: true
+        periodSeconds:
+          type: integer
+        amount:
+          type: integer
+        budget:
+          type: integer
+        pricePerShipment:
+          type: integer
+          description: Precio congelado por envío (con prioridad y seguro).
+        budgetSpent:
+          type: integer
+        budgetRemaining:
+          type: integer
+        sentCount:
+          type: integer
+        remaining:
+          type: integer
+        status:
+          type: string
+          description: active | paused | completed | exhausted | cancelled
+        sfnExecutionArn:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SubscriptionDetail:
+      allOf:
+        - $ref: "#/components/schemas/SubscriptionView"
+        - type: object
+          properties:
+            shipments:
+              type: array
+              items:
+                $ref: "#/components/schemas/SubscriptionShipment"
+            ledger:
+              type: array
+              items:
+                $ref: "#/components/schemas/BudgetLedgerEntry"
+
+    SubscriptionShipment:
+      type: object
+      properties:
+        id:
+          type: string
+        idempotencyKey:
+          type: string
+        tickNumber:
+          type: integer
+        packageId:
+          type: string
+          nullable: true
+        cost:
+          type: integer
+        status:
+          type: string
+          description: triggered | sent | failed | skipped-no-budget
+        reason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    BudgetLedgerEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        delta:
+          type: integer
+          description: Positivo = recarga inicial; negativo = débito por envío.
+        balanceAfter:
+          type: integer
+        reason:
+          type: string
+        refId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    FeedEvent:
+      type: object
+      required: [type, timestamp]
+      properties:
+        type:
+          type: string
+          enum:
+            - package-created
+            - package-received
+            - package-redirected
+            - insurance-charged
+            - package-status
+        timestamp:
+          type: string
+          format: date-time
+        packageId:
+          type: string
+        status:
+          type: string
+        reason:
+          type: string
+        origin:
+          $ref: "#/components/schemas/CityCode"
+        destination:
+          $ref: "#/components/schemas/CityCode"
+        amount:
+          type: integer
+        message:
+          type: string
+
+    Paginated:
+      type: object
+      properties:
+        data:
+          type: array
+          items: {}
+        meta:
+          type: object
+          properties:
+            total:
+              type: integer
+            page:
+              type: integer
+            limit:
+              type: integer
+            totalPages:
+              type: integer
+
+    Error:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          oneOf:
+            - type: string
+            - type: object
+        error:
+          type: string
