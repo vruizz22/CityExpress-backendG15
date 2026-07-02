@@ -8,7 +8,13 @@ export const PackageBodySchema = z.object({
   deliverNotBefore: z.string().datetime().nullable().optional(),
   originId: z.string().min(1),
   destinationId: z.string().min(1),
-  metaContent: z.string().nullable().optional(),
+  // RF02 (E3): el enunciado define metaContent como objeto (`{"insured": true}`),
+  // pero otros grupos (y nuestros mensajes previos) lo envían como string. Si
+  // solo aceptáramos string, NACKearíamos todo paquete asegurado entrante.
+  metaContent: z
+    .union([z.string(), z.record(z.string(), z.unknown())])
+    .nullable()
+    .optional(),
   isMetaEncrypted: z.boolean(),
   constraints: z.record(z.string(), z.unknown()).nullable().optional(),
   priorityClass: z.string().min(1),

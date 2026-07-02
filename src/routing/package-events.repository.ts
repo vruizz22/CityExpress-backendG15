@@ -39,6 +39,25 @@ export class PackageEventsRepository {
     });
   }
 
+  /**
+   * RF02 (E3) — claim idempotente genérico con idpk determinístico
+   * `<kind>:<packageId>` (mismo patrón P2002 de recordInitialSent). El caller
+   * solo ejecuta la acción cuando devuelve 'created': reintentos del broker o
+   * package-status duplicados no repiten notificaciones ni cobros.
+   */
+  async claim(
+    kind: 'pkg-status' | 'insurance',
+    packageBody: PackageBody,
+    senderCityId: string | null,
+  ): Promise<RecordResult> {
+    return this.create({
+      idpk: `${kind}:${packageBody.id}`,
+      type: kind,
+      packageBody,
+      senderCityId,
+    });
+  }
+
   private async create(input: {
     idpk: string;
     type: string;
