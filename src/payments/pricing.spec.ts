@@ -2,6 +2,7 @@ import {
   computeAmount,
   dimensionsValid,
   getFPrice,
+  getPriorityLevel,
   MAX_AMOUNT,
   MIN_AMOUNT,
 } from './pricing';
@@ -69,6 +70,20 @@ describe('pricing', () => {
     it('default 1 si no es numérico', () => {
       process.env.F_PRICE = 'abc';
       expect(getFPrice()).toBe(1);
+    });
+  });
+
+  // RF03 — niveles AMQP del enunciado E3.
+  describe('getPriorityLevel', () => {
+    it('mapea low/medium/high a 1/2/3', () => {
+      expect(getPriorityLevel('low')).toBe(1);
+      expect(getPriorityLevel('medium')).toBe(2);
+      expect(getPriorityLevel('high')).toBe(3);
+    });
+
+    it('default 2 (medium) para clases desconocidas', () => {
+      expect(getPriorityLevel('urgent')).toBe(2);
+      expect(getPriorityLevel('')).toBe(2);
     });
   });
 });

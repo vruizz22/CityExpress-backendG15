@@ -55,6 +55,20 @@ describe('AmqpInitialShipmentService', () => {
     expect(message.packageBody.id).toBe('pkg-1');
   });
 
+  // RF03 — la creación publica con prioridad AMQP según priorityClass.
+  it('publishes with the AMQP priority mapped from priorityClass', async () => {
+    const { broker, service } = makeService();
+
+    await service.send({ ...buildPackage('price'), priorityClass: 'high' });
+
+    const [, , options] = (broker.send as jest.Mock).mock.calls[0] as [
+      string,
+      PackageTransitMessage,
+      { priority?: number } | undefined,
+    ];
+    expect(options).toEqual({ priority: 3 });
+  });
+
   it('is idempotent: a duplicate claim does not publish', async () => {
     const { broker, packageEvents, service } = makeService();
     (packageEvents.recordInitialSent as jest.Mock).mockResolvedValue(

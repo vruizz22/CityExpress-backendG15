@@ -15,6 +15,7 @@ import { DistanceTableService } from '@/routing/distance-table.service';
 import { PackageEventsRepository } from '@/routing/package-events.repository';
 import { PendingPackagesRepository } from '@/routing/pending-packages.repository';
 import { PackageDeliveryService } from '@/routing/package-delivery.service';
+import { getPriorityLevel } from '@/payments/pricing';
 import { PackageBody } from '@dto/package.dto';
 import { PackageEvent } from '@prisma/client';
 
@@ -281,7 +282,10 @@ export class PackageService {
       type: 'package-transit',
       packageBody,
     };
-    await this.broker.send(cityRoutingKey(destinationCityId), message);
+    // RF03 — redirecciones con prioridad AMQP según priorityClass.
+    await this.broker.send(cityRoutingKey(destinationCityId), message, {
+      priority: getPriorityLevel(packageBody.priorityClass),
+    });
   }
 
   private async sendAck(

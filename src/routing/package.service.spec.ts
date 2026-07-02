@@ -221,6 +221,39 @@ describe('PackageService', () => {
     expect(audit.reportTransitRedirect).toHaveBeenCalledWith('pkg-1', 'MET');
   });
 
+  // RF03 — al redirigir, el package-transit sale con prioridad AMQP 1/2/3.
+  it.each([
+    ['low', 1],
+    ['medium', 2],
+    ['high', 3],
+  ])(
+    'forwards package-transit with AMQP priority %s -> %i (RF03)',
+    async (priorityClass, expectedPriority) => {
+      distanceTable.getNextHop.mockReturnValue('MET');
+      const message = baseMessage({
+        packageBody: {
+          ...baseMessage().packageBody,
+          destinationId: 'HGW',
+          maxHops: 3,
+          priorityClass,
+        },
+      });
+
+      await service.handlePackageTransit(message, new Date());
+
+      const transitCall = broker.send.mock.calls.find(
+        ([routingKey, payload]) =>
+          routingKey === 'city.met' &&
+          (payload as PackageTransitMessage).type === 'package-transit',
+      ) as
+        | [string, PackageTransitMessage, { priority?: number } | undefined]
+        | undefined;
+
+      expect(transitCall).toBeDefined();
+      expect(transitCall?.[2]).toEqual({ priority: expectedPriority });
+    },
+  );
+
   it('persists pending route when no routes are available', async () => {
     // --- ACTUALIZADO: getNextHop devuelve null (Sin ruta calculada aún) ---
     distanceTable.getNextHop.mockReturnValue(null);
