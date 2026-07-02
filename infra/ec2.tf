@@ -1,5 +1,5 @@
 # RNF02 (bonus) — Adopción de la EC2 del backend + su SG + rol/instance-profile.
-# TODO existía desde E1 (launch-wizard). Se importa a IaC hasta drift 0, SIN
+# Estos recursos ya existían desde E1 (launch-wizard). Se importan a IaC (drift 0), SIN
 # recrear nada. La instancia lleva prevent_destroy: si un plan pidiera reemplazo,
 # el apply FALLA en vez de tumbar producción.
 
