@@ -1,0 +1,73 @@
+{
+  "Comment": "GEMELO SOLO-PARA-TEST del state-machine.asl.json. Única diferencia: DispatchTick usa lambda:invoke (mockeable de forma determinista en Step Functions Local) en vez de sqs:sendMessage.waitForTaskToken. La lógica de control (loop, Choice, Wait, tickNumber++, terminales) es IDÉNTICA a producción. Mantener en sync con ../state-machine.asl.json.",
+  "StartAt": "Initialize",
+  "States": {
+    "Initialize": {
+      "Type": "Pass",
+      "Result": 0,
+      "ResultPath": "$.tickNumber",
+      "Next": "DispatchTick"
+    },
+    "DispatchTick": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "DispatcherLambda",
+        "Payload": {
+          "subscriptionId.$": "$.subscriptionId",
+          "tickNumber.$": "$.tickNumber"
+        }
+      },
+      "ResultPath": "$.tick",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "Failed"
+        }
+      ],
+      "Next": "EvaluateStatus"
+    },
+    "EvaluateStatus": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Or": [
+            { "Variable": "$.tick.status", "StringEquals": "triggered" },
+            { "Variable": "$.tick.status", "StringEquals": "duplicate" }
+          ],
+          "Next": "WaitPeriod"
+        }
+      ],
+      "Default": "Done"
+    },
+    "WaitPeriod": {
+      "Type": "Wait",
+      "SecondsPath": "$.periodSeconds",
+      "Next": "IncrementTick"
+    },
+    "IncrementTick": {
+      "Type": "Pass",
+      "Parameters": {
+        "subscriptionId.$": "$.subscriptionId",
+        "periodSeconds.$": "$.periodSeconds",
+        "tickNumber.$": "States.MathAdd($.tickNumber, 1)"
+      },
+      "Next": "DispatchTick"
+    },
+    "Done": { "Type": "Succeed" },
+    "Failed": {
+      "Type": "Fail",
+      "Error": "SubscriptionEngineFailed",
+      "Cause": "Fallo irrecuperable tras reintentos."
+    }
+  }
+}

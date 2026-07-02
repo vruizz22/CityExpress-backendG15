@@ -1,0 +1,32 @@
+{
+  "StateMachines": {
+    "SubscriptionEngine": {
+      "TestCases": {
+        "CompletesAfterThree": { "DispatchTick": "Triggeredx2ThenCompleted" },
+        "BudgetExhausted": { "DispatchTick": "TriggeredThenNoBudget" },
+        "Cancelled": { "DispatchTick": "TriggeredThenInactive" },
+        "DuplicateThenCompleted": { "DispatchTick": "TriggeredDuplicateCompleted" }
+      }
+    }
+  },
+  "MockedResponses": {
+    "Triggeredx2ThenCompleted": {
+      "0": { "Return": { "status": "triggered", "idempotencyKey": "sub:0" } },
+      "1": { "Return": { "status": "triggered", "idempotencyKey": "sub:1" } },
+      "2": { "Return": { "status": "completed", "idempotencyKey": "sub:2" } }
+    },
+    "TriggeredThenNoBudget": {
+      "0": { "Return": { "status": "triggered", "idempotencyKey": "sub:0" } },
+      "1": { "Return": { "status": "skipped-no-budget", "idempotencyKey": "sub:1" } }
+    },
+    "TriggeredThenInactive": {
+      "0": { "Return": { "status": "triggered", "idempotencyKey": "sub:0" } },
+      "1": { "Return": { "status": "inactive", "idempotencyKey": "sub:1" } }
+    },
+    "TriggeredDuplicateCompleted": {
+      "0": { "Return": { "status": "triggered", "idempotencyKey": "sub:0" } },
+      "1": { "Return": { "status": "duplicate", "idempotencyKey": "sub:1" } },
+      "2": { "Return": { "status": "completed", "idempotencyKey": "sub:2" } }
+    }
+  }
+}
