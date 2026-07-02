@@ -20,7 +20,7 @@
                     <mxGeometry x="-390" y="-359" width="160" height="73" as="geometry"/>
                 </mxCell>
                 <mxCell id="11" value="" style="html=1;whiteSpace=wrap;movable=0;resizable=0;rotatable=0;deletable=0;editable=0;locked=1;connectable=0;" vertex="1" parent="1">
-                    <mxGeometry x="-167.5" y="-890" width="1647.5" height="1120" as="geometry"/>
+                    <mxGeometry x="-167.5" y="-1160" width="1647.5" height="1390" as="geometry"/>
                 </mxCell>
                 <mxCell id="12" value="&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;font style=&quot;font-size: 36px;&quot;&gt;«subsystem»&lt;/font&gt;&lt;/span&gt;&lt;div&gt;&lt;b style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251);&quot;&gt;&lt;font style=&quot;font-size: 36px;&quot;&gt;AWS Cloud (us-east-1)&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
                     <mxGeometry x="243.75" y="-850" width="825" height="130" as="geometry"/>
@@ -210,7 +210,7 @@
                 <mxCell id="103" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
                     <mxGeometry x="790" y="-222" width="20" height="15" as="geometry"/>
                 </mxCell>
-                <mxCell id="118" value="" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=halfCircle;endFill=0;endSize=6;strokeWidth=1;sketch=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="91">
+                <mxCell id="118" value="package-transit (priority 1–3) · package-status · ack/nack · tablas" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=halfCircle;endFill=0;endSize=6;strokeWidth=1;sketch=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;fontSize=10;" edge="1" parent="1" source="91">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="710" y="-88.17000000000002" as="sourcePoint"/>
                         <mxPoint x="180" y="-160" as="targetPoint"/>
@@ -416,6 +416,111 @@
                 </mxCell>
                 <mxCell id="212" value="" style="ellipse;whiteSpace=wrap;html=1;align=center;aspect=fixed;fillColor=none;strokeColor=none;resizable=0;perimeter=centerPerimeter;rotatable=0;allowArrows=0;points=[];outlineConnect=1;" vertex="1" parent="1">
                     <mxGeometry x="-315" y="-634" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3box" value="" style="html=1;whiteSpace=wrap;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="760" y="-1120" width="700" height="250" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3boxlbl" value="«subsystem»&lt;br&gt;&lt;b&gt;Motor de Suscripciones (RF01 E3 — Step Functions)&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="770" y="-1118" width="420" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3sfn" value="«component»&lt;br&gt;&lt;b&gt;AWS Step Functions&lt;br&gt;(state machine)&lt;/b&gt;" style="html=1;dropTarget=0;whiteSpace=wrap;" vertex="1" parent="1">
+                    <mxGeometry x="790" y="-1070" width="190" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3sfnmod" value="" style="shape=module;jettyWidth=8;jettyHeight=4;" vertex="1" parent="e3sfn">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e3sqs" value="«component»&lt;br&gt;&lt;b&gt;SQS tick + DLQ&lt;/b&gt;" style="html=1;dropTarget=0;whiteSpace=wrap;" vertex="1" parent="1">
+                    <mxGeometry x="1050" y="-1070" width="180" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3sqsmod" value="" style="shape=module;jettyWidth=8;jettyHeight=4;" vertex="1" parent="e3sqs">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e3lambda" value="«component»&lt;br&gt;&lt;b&gt;Lambda Dispatcher&lt;/b&gt;" style="html=1;dropTarget=0;whiteSpace=wrap;" vertex="1" parent="1">
+                    <mxGeometry x="1050" y="-960" width="180" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3lambdamod" value="" style="shape=module;jettyWidth=8;jettyHeight=4;" vertex="1" parent="e3lambda">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e3notesfn" value="&lt;div&gt;[Supuesto / contrato RF01]&lt;/div&gt;&lt;div&gt;Trigger: master hace StartExecution&lt;/div&gt;&lt;div&gt;idempotente (name = subscriptionId).&lt;/div&gt;&lt;div&gt;Loop: DispatchTick → SQS&lt;/div&gt;&lt;div&gt;(waitForTaskToken) → Lambda →&lt;/div&gt;&lt;div&gt;POST /subscriptions/:id/tick&lt;/div&gt;&lt;div&gt;(x-tick-secret) → SendTaskSuccess.&lt;/div&gt;" style="shape=note;strokeWidth=2;fontSize=10;size=20;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#666600;align=left;" vertex="1" parent="1">
+                    <mxGeometry x="1255" y="-1070" width="190" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3edgesfnsqs" value="DispatchTick" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;sketch=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontSize=10;" edge="1" parent="1" source="e3sfn" target="e3sqs">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3edgesqslambda" value="event source" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;sketch=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" edge="1" parent="1" source="e3sqs" target="e3lambda">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3itick" value="&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;ISubscriptionTick" style="ellipse;whiteSpace=wrap;html=1;align=center;aspect=fixed;fillColor=none;strokeColor=none;resizable=0;perimeter=centerPerimeter;rotatable=0;allowArrows=0;points=[];outlineConnect=1;" vertex="1" parent="1">
+                    <mxGeometry x="1100" y="-880" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3edgeticklollipop" value="" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=oval;endFill=0;sketch=0;sourcePerimeterSpacing=0;targetPerimeterSpacing=0;endSize=10;exitX=0.75;exitY=0;exitDx=0;exitDy=0;" edge="1" parent="1" source="91" target="e3itick">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="865" y="-240"/>
+                            <mxPoint x="1105" y="-240"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e3edgeticksocket" value="" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=halfCircle;endFill=0;endSize=6;strokeWidth=1;sketch=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="e3lambda" target="e3itick">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1140" y="-875"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e3edgestart" value="StartExecution (trigger RF01)" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeWidth=1;sketch=0;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontSize=10;" edge="1" parent="1" source="91" target="e3sfn">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="775" y="-165"/>
+                            <mxPoint x="612" y="-165"/>
+                            <mxPoint x="612" y="-1035"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e3ev" value="«component»&lt;br&gt;&lt;b&gt;EventsController (SSE)&lt;/b&gt;" style="html=1;dropTarget=0;whiteSpace=wrap;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="845" y="-30" width="125" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3evmod" value="" style="shape=module;jettyWidth=8;jettyHeight=4;" vertex="1" parent="e3ev">
+                    <mxGeometry x="1" width="15" height="15" relative="1" as="geometry">
+                        <mxPoint x="-20" y="5" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e3ins" value="«component»&lt;br&gt;&lt;b&gt;InsuranceService&lt;/b&gt;" style="html=1;dropTarget=0;whiteSpace=wrap;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="978" y="-30" width="92" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3insmod" value="" style="shape=module;jettyWidth=8;jettyHeight=4;" vertex="1" parent="e3ins">
+                    <mxGeometry x="1" width="15" height="15" relative="1" as="geometry">
+                        <mxPoint x="-20" y="5" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e3ifeed" value="&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;IEventFeed" style="ellipse;whiteSpace=wrap;html=1;align=center;aspect=fixed;fillColor=none;strokeColor=none;resizable=0;perimeter=centerPerimeter;rotatable=0;allowArrows=0;points=[];outlineConnect=1;" vertex="1" parent="1">
+                    <mxGeometry x="645" y="-15" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3edgefeedlollipop" value="" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=oval;endFill=0;sketch=0;sourcePerimeterSpacing=0;targetPerimeterSpacing=0;endSize=10;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="e3ev" target="e3ifeed">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3edgefeedsocket" value="GET /events/stream (SSE)" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=halfCircle;endFill=0;endSize=6;strokeWidth=1;sketch=0;exitX=1;exitY=0.75;exitDx=0;exitDy=0;fontSize=10;" edge="1" parent="1" source="69" target="e3ifeed">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="585" y="-300"/>
+                            <mxPoint x="585" y="-10"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e3notepriority" value="&lt;div&gt;[RF03 E3 — priority queues]&lt;/div&gt;&lt;div&gt;Todo package-transit se publica con la&lt;/div&gt;&lt;div&gt;propiedad AMQP priority: low=1,&lt;/div&gt;&lt;div&gt;medium=2, high=3 (creación y redirección);&lt;/div&gt;&lt;div&gt;preservada en el buffer offline.&lt;/div&gt;&lt;div&gt;Supuesto: las colas city.* las declara la&lt;/div&gt;&lt;div&gt;central — cumplimiento lado productor;&lt;/div&gt;&lt;div&gt;el efecto requiere x-max-priority en la&lt;/div&gt;&lt;div&gt;cola destino.&lt;/div&gt;" style="shape=note;strokeWidth=2;fontSize=10;size=20;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#666600;align=left;" vertex="1" parent="1">
+                    <mxGeometry x="-460" y="-80" width="290" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3noteinsurance" value="&lt;div&gt;[RF02 E3 — seguros / package-status]&lt;/div&gt;&lt;div&gt;Asegurado (metaContent.insured) no&lt;/div&gt;&lt;div&gt;entregable ⇒ la ciudad tenedora publica&lt;/div&gt;&lt;div&gt;package-status: expired (reason) a&lt;/div&gt;&lt;div&gt;city.&amp;lt;origen&amp;gt;. El origen (InsuranceService)&lt;/div&gt;&lt;div&gt;cobra el seguro UNA vez: claims idempotentes&lt;/div&gt;&lt;div&gt;pkg-status:&amp;lt;id&amp;gt; / insurance:&amp;lt;id&amp;gt; en PackageEvent,&lt;/div&gt;&lt;div&gt;estado expired-insured y evento&lt;/div&gt;&lt;div&gt;insurance-charged al feed SSE (anti-loop:&lt;/div&gt;&lt;div&gt;dedup msgId + sin auto-mensajes).&lt;/div&gt;" style="shape=note;strokeWidth=2;fontSize=10;size=20;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#666600;align=left;" vertex="1" parent="1">
+                    <mxGeometry x="-460" y="90" width="290" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3notenr" value="&lt;div&gt;[RNF01/RNF04 E3 — observabilidad]&lt;/div&gt;&lt;div&gt;APM + infra + alertas (latencia,&lt;/div&gt;&lt;div&gt;error rate) sobre master y motor&lt;/div&gt;&lt;div&gt;de suscripciones.&lt;/div&gt;" style="shape=note;strokeWidth=2;fontSize=10;size=20;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#666600;align=left;" vertex="1" parent="1">
+                    <mxGeometry x="1560" y="-220" width="200" height="100" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>

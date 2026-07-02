@@ -71,6 +71,13 @@ Una tarea cierra cuando:
 - Demo en vivo con ayudante.
 - Coevaluación grupal (form que define el equipo docente).
 
+### E3 — Mensajería (owner: Victor) — completado mié 02/07/2026
+
+- ✅ RF03 mensajería: `package-transit` con prioridad AMQP 1/2/3 según `priorityClass` (PR #63 — `docs/prompts/2026-07-02-e3-rf03-priority-publish.md`).
+- ✅ RF02 mensajería: `insured` en `metaContent`, `package-status: expired` a ciudad origen, cobro idempotente del seguro + feed SSE `package-received`/`package-redirected`/`insurance-charged` (PR #64 — `docs/prompts/2026-07-02-e3-rf02-insurance-messaging.md`).
+- ✅ RDOC01: UML de componentes actualizado (`docs/arquitectura.drawio` + `architecture.md §10`) — motor de suscripciones, priority queues, seguros, SSE y observabilidad (esta PR).
+- Resto de la E3 (RF01 infra, RNF02/RNF03, observabilidad, frontend): owners Guillermo / Joaco / Andrés / Oriana — ver sus AI-logs en `docs/prompts/`.
+
 ---
 
 ## 4. Gitflow obligatorio
