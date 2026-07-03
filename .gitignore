@@ -102,3 +102,7 @@ coverage
 .env.test.local
 
 /E2
+
+# Evidencia cruda de Prowler (generada, ~32 MB de CSV/HTML/OCSF). No se versiona:
+# el resumen antes/después vive en docs/prowler.md y se reproduce con sus comandos.
+docs/prowler/

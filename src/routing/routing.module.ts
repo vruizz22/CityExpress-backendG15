@@ -6,6 +6,7 @@ import { NoopMessageBrokerService } from '@/messaging/noop-message-broker.servic
 import { RoutingCalcModule } from '@/routing-calc/routing-calc.module';
 import { AuditService } from '@/routing/audit.service';
 import { DistanceTableService } from '@/routing/distance-table.service';
+import { InsuranceService } from '@/routing/insurance.service';
 import { PackageEventsRepository } from '@/routing/package-events.repository';
 import { PackageService } from '@/routing/package.service';
 import { PendingPackagesRepository } from '@/routing/pending-packages.repository';
@@ -26,6 +27,7 @@ import { RoutingOrchestratorService } from '@/routing/routing-orchestrator.servi
     PackageEventsRepository,
     PendingPackagesRepository,
     RouteRepository,
+    InsuranceService,
     PackageService,
     RoutingSubscriberService,
     RoutingOrchestratorService,

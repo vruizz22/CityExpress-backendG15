@@ -1,6 +1,7 @@
 import { RoutingSubscriberService } from '@/routing/routing-subscriber.service';
 import { MessageBrokerService } from '@/messaging/message-broker.interface';
 import { DistanceTableService } from '@/routing/distance-table.service';
+import { InsuranceService } from '@/routing/insurance.service';
 import { PackageService } from '@/routing/package.service';
 
 type Handler = (message: unknown) => Promise<void>;
@@ -20,12 +21,16 @@ function makeSubscriber() {
     processPendingRoutes: jest.fn().mockResolvedValue(undefined),
     handlePackageTransit: jest.fn().mockResolvedValue(undefined),
   } as unknown as PackageService;
+  const insurance = {
+    chargeInsurance: jest.fn().mockResolvedValue(undefined),
+  } as unknown as InsuranceService;
   const service = new RoutingSubscriberService(
     broker,
     packageService,
     distanceTable,
+    insurance,
   );
-  return { broker, distanceTable, packageService, service };
+  return { broker, distanceTable, packageService, insurance, service };
 }
 
 function getHandler(broker: MessageBrokerService): Handler {
@@ -186,6 +191,85 @@ describe('RoutingSubscriberService', () => {
     await handler(msg);
 
     expect(distanceTable.applyOwnTable).toHaveBeenCalledTimes(1);
+  });
+
+  // RF02 (E3) — package-status: somos la ciudad ORIGEN de un asegurado no entregable.
+  describe('package-status', () => {
+    const statusMessage = {
+      idpk: 'idpk-st-1',
+      msgId: 'msg-st-1',
+      type: 'package-status',
+      cityId: 'hgw',
+      timestamp: '2026-07-02T00:00:00.000Z',
+      data: { pkgId: 'pkg-1', status: 'expired', reason: 'max hops exceeded' },
+    };
+
+    it('acks the sender and triggers the idempotent insurance charge', async () => {
+      const { broker, insurance, service } = makeSubscriber();
+      await service.onModuleInit();
+      const handler = getHandler(broker);
+
+      await handler(statusMessage);
+
+      const ackCall = (broker.send as jest.Mock).mock.calls.find(
+        ([routingKey, payload]: [string, { type?: string }]) =>
+          routingKey === 'city.hgw' && payload?.type === 'ack',
+      ) as [string, { idpk: string; msgId: string }] | undefined;
+      expect(ackCall).toBeDefined();
+      expect(ackCall?.[1].idpk).toBe('idpk-st-1');
+      expect(ackCall?.[1].msgId).toBe('msg-st-1');
+      expect(insurance.chargeInsurance).toHaveBeenCalledWith(
+        'pkg-1',
+        'max hops exceeded',
+      );
+    });
+
+    it('nacks a malformed package-status without charging', async () => {
+      const { broker, insurance, service } = makeSubscriber();
+      await service.onModuleInit();
+      const handler = getHandler(broker);
+
+      await handler({
+        idpk: 'idpk-st-2',
+        msgId: 'msg-st-2',
+        type: 'package-status',
+        cityId: 'hgw',
+        timestamp: '2026-07-02T00:00:00.000Z',
+        data: { status: 'expired' }, // sin pkgId
+      });
+
+      const nackCall = (broker.send as jest.Mock).mock.calls.find(
+        ([routingKey, payload]: [string, { type?: string }]) =>
+          routingKey === 'city.hgw' && payload?.type === 'nack',
+      ) as [string, { type: string }] | undefined;
+      expect(nackCall).toBeDefined();
+      expect(insurance.chargeInsurance).not.toHaveBeenCalled();
+    });
+
+    it('acks but does not charge for a non-expired status', async () => {
+      const { broker, insurance, service } = makeSubscriber();
+      await service.onModuleInit();
+      const handler = getHandler(broker);
+
+      await handler({
+        ...statusMessage,
+        msgId: 'msg-st-3',
+        data: { pkgId: 'pkg-1', status: 'delivered', reason: 'ok' },
+      });
+
+      expect(insurance.chargeInsurance).not.toHaveBeenCalled();
+    });
+
+    it('drops duplicate package-status by msgId before re-charging', async () => {
+      const { broker, insurance, service } = makeSubscriber();
+      await service.onModuleInit();
+      const handler = getHandler(broker);
+
+      await handler(statusMessage);
+      await handler(statusMessage);
+
+      expect(insurance.chargeInsurance).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('ignores ack messages without throwing', async () => {

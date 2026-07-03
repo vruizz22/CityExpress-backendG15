@@ -20,10 +20,15 @@ const sub = {
 function makeEngine(opts?: {
   tickResult?: TickResult;
   sendImpl?: () => Promise<void>;
+  subOverrides?: Record<string, unknown>;
 }) {
   const updates: Array<{ where: unknown; data: Record<string, unknown> }> = [];
   const prisma = {
-    subscription: { findUnique: jest.fn().mockResolvedValue(sub) },
+    subscription: {
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ ...sub, ...opts?.subOverrides }),
+    },
     subscriptionShipment: {
       update: jest.fn(
         (args: { where: unknown; data: Record<string, unknown> }) => {
@@ -67,6 +72,21 @@ describe('SubscriptionEngineService.runTick (RF01)', () => {
     expect(events.publish).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'package-created' }),
     );
+  });
+
+  // RF02 (E3) — los ticks asegurados salen con insured en metaContent (enunciado).
+  it('despacha asegurados con metaContent { insured: true }', async () => {
+    const { engine, initialShipment } = makeEngine({
+      subOverrides: { insured: true, metaContent: 'regalo' },
+    });
+
+    await engine.runTick('sub-1', 1);
+
+    const [body] = (initialShipment.send as jest.Mock).mock.calls[0] as [
+      { metaContent: unknown; constraints: Record<string, unknown> },
+    ];
+    expect(body.metaContent).toEqual({ insured: true, note: 'regalo' });
+    expect(body.constraints).toMatchObject({ insured: true });
   });
 
   it('no despacha si el tick no terminó en triggered (sin budget / duplicado)', async () => {

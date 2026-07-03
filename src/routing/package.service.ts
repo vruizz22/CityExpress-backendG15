@@ -10,11 +10,15 @@ import {
   MessageEnvelopeSchema,
   PackageTransitMessageSchema,
 } from '@/messaging/message.schemas';
+import { EventsService } from '@/events/events.service';
 import { AuditService } from '@/routing/audit.service';
 import { DistanceTableService } from '@/routing/distance-table.service';
+import { InsuranceService } from '@/routing/insurance.service';
+import { normalizeMetaContent } from '@/routing/insurance.util';
 import { PackageEventsRepository } from '@/routing/package-events.repository';
 import { PendingPackagesRepository } from '@/routing/pending-packages.repository';
 import { PackageDeliveryService } from '@/routing/package-delivery.service';
+import { getPriorityLevel } from '@/payments/pricing';
 import { PackageBody } from '@dto/package.dto';
 import { PackageEvent } from '@prisma/client';
 
@@ -27,6 +31,8 @@ export class PackageService {
     private readonly packageEvents: PackageEventsRepository,
     private readonly pendingRepository: PendingPackagesRepository,
     private readonly deliveryService: PackageDeliveryService,
+    private readonly insurance: InsuranceService,
+    private readonly events: EventsService,
   ) {}
 
   // --- Drenado acotado del backlog de 'pending-route' (anti-OOM) ---
@@ -72,6 +78,8 @@ export class PackageService {
   ) {
     if (pkg.maxHops <= 0) {
       await this.auditService.reportExpired(pkg.id);
+      // RF02 (E3) — asegurado no entregable: notificar origen / cobrar seguro.
+      await this.insurance.handleUndeliverable(pkg, 'max hops exceeded');
       return;
     }
 
@@ -94,6 +102,7 @@ export class PackageService {
     }
 
     await this.sendPackage(nextCityId, forwardedPackage);
+    this.publishRedirectedEvent(pkg, nextCityId);
 
     if (nextCityId === pkg.destinationId) {
       await this.auditService.reportTransit(pkg.id, pkg.destinationId);
@@ -157,6 +166,13 @@ export class PackageService {
     }
 
     const pkg = normalizedPayload.packageBody;
+    // RF04 — feed en vivo: paquete recibido en nuestra cola (una vez por idpk).
+    this.events.publish({
+      type: 'package-received',
+      packageId: pkg.id,
+      origin: resolvedSenderCityId,
+      destination: pkg.destinationId,
+    });
     if (sameCity(pkg.destinationId, CITY_ID)) {
       await this.processFinalDestination(pkg, normalizedPayload, now);
     } else {
@@ -241,6 +257,8 @@ export class PackageService {
     const pkg = this.toPackageBody(record);
     if (pkg.maxHops <= 0) {
       await this.auditService.reportExpired(pkg.id);
+      // RF02 (E3) — asegurado no entregable: notificar origen / cobrar seguro.
+      await this.insurance.handleUndeliverable(pkg, 'max hops exceeded');
       await this.pendingRepository.removePending(record.idpk);
       return;
     }
@@ -261,6 +279,7 @@ export class PackageService {
     }
 
     await this.sendPackage(nextCityId, forwardedPackage);
+    this.publishRedirectedEvent(pkg, nextCityId);
 
     if (nextCityId === pkg.destinationId) {
       await this.auditService.reportTransit(pkg.id, pkg.destinationId);
@@ -269,6 +288,16 @@ export class PackageService {
     }
 
     await this.pendingRepository.removePending(record.idpk);
+  }
+
+  // RF04 — feed en vivo: paquete redirigido al siguiente salto.
+  private publishRedirectedEvent(pkg: PackageBody, nextCityId: string): void {
+    this.events.publish({
+      type: 'package-redirected',
+      packageId: pkg.id,
+      origin: pkg.originId,
+      destination: nextCityId,
+    });
   }
 
   private async sendPackage(
@@ -281,7 +310,10 @@ export class PackageService {
       type: 'package-transit',
       packageBody,
     };
-    await this.broker.send(cityRoutingKey(destinationCityId), message);
+    // RF03 — redirecciones con prioridad AMQP según priorityClass.
+    await this.broker.send(cityRoutingKey(destinationCityId), message, {
+      priority: getPriorityLevel(packageBody.priorityClass),
+    });
   }
 
   private async sendAck(
@@ -333,7 +365,9 @@ export class PackageService {
       deliverNotBefore: record.deliverNotBefore?.toISOString() ?? null,
       originId: record.originId,
       destinationId: record.destinationId,
-      metaContent: record.metaContent ?? null,
+      // RF02 (E3): la columna guarda objetos serializados; se restaura el
+      // formato original antes de reenviar (interop con otros grupos).
+      metaContent: normalizeMetaContent(record.metaContent ?? null),
       isMetaEncrypted: record.isMetaEncrypted,
       constraints:
         record.constraints && typeof record.constraints === 'object'

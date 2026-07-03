@@ -7,13 +7,14 @@ import {
 } from '@nestjs/common';
 import * as amqp from 'amqplib';
 import { BaseMessage } from './message.types';
-import { MessageBrokerService } from './message-broker.interface';
+import { MessageBrokerService, SendOptions } from './message-broker.interface';
 
 const FIBONACCI_DELAYS_S = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
 
 interface PendingMessage {
   routingKey: string;
   content: Buffer;
+  options?: SendOptions;
 }
 
 @Injectable()
@@ -125,10 +126,24 @@ export class AmqpMessageBrokerService
     while (this.pendingMessages.length > 0) {
       const pending = this.pendingMessages.shift();
       if (!pending || !this.channel) break;
-      this.channel.publish(this.exchange, pending.routingKey, pending.content, {
-        persistent: true,
-      });
+      this.channel.publish(
+        this.exchange,
+        pending.routingKey,
+        pending.content,
+        this.publishOptions(pending.options),
+      );
     }
+  }
+
+  // RF03 — la prioridad AMQP solo surte efecto si la cola destino fue declarada
+  // con x-max-priority (lo controla la central); el productor la adjunta siempre.
+  private publishOptions(options?: SendOptions): amqp.Options.Publish {
+    return {
+      persistent: true,
+      ...(options?.priority !== undefined
+        ? { priority: options.priority }
+        : {}),
+    };
   }
 
   private async startConsuming(
@@ -161,18 +176,25 @@ export class AmqpMessageBrokerService
     });
   }
 
-  send<T extends BaseMessage>(routingKey: string, message: T): Promise<void> {
+  send<T extends BaseMessage>(
+    routingKey: string,
+    message: T,
+    options?: SendOptions,
+  ): Promise<void> {
     const content = Buffer.from(JSON.stringify(message));
     if (!this.channel) {
       this.logger.warn(
         `No channel — queuing message for later (routingKey=${routingKey}, type=${message.type})`,
       );
-      this.pendingMessages.push({ routingKey, content });
+      this.pendingMessages.push({ routingKey, content, options });
       return Promise.resolve();
     }
-    this.channel.publish(this.exchange, routingKey, content, {
-      persistent: true,
-    });
+    this.channel.publish(
+      this.exchange,
+      routingKey,
+      content,
+      this.publishOptions(options),
+    );
     return Promise.resolve();
   }
 

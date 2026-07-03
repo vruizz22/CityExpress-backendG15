@@ -11,7 +11,7 @@ export class EventsService {
   private readonly maxRecent = Number(process.env.FEED_RECENT_MAX ?? 50);
 
   publish(event: FeedEventInput): FeedEvent {
-    const full: FeedEvent = { at: new Date().toISOString(), ...event };
+    const full: FeedEvent = { timestamp: new Date().toISOString(), ...event };
     this.recent.push(full);
     if (this.recent.length > this.maxRecent) {
       this.recent.shift();

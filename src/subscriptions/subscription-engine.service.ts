@@ -58,7 +58,14 @@ export class SubscriptionEngineService {
       deliverNotBefore: null,
       originId: sub.originId,
       destinationId: sub.destinationId,
-      metaContent: sub.metaContent,
+      // RF02 (E3): insured como objeto en metaContent (enunciado); la nota se
+      // conserva bajo `note`. constraints.insured queda por retro-compat.
+      metaContent: sub.insured
+        ? {
+            insured: true,
+            ...(sub.metaContent ? { note: sub.metaContent } : {}),
+          }
+        : sub.metaContent,
       isMetaEncrypted: false,
       constraints: { criteria: sub.criteria, insured: sub.insured },
       priorityClass: sub.priorityClass,
@@ -74,9 +81,10 @@ export class SubscriptionEngineService {
       this.events.publish({
         type: 'package-created',
         packageId,
-        cityId: sub.originId,
+        origin: sub.originId,
+        destination: sub.destinationId,
+        amount: sub.pricePerShipment,
         message: `Suscripción: envío a ${sub.destinationId}`,
-        data: { subscriptionId: sub.id, destinationId: sub.destinationId },
       });
     } catch (err) {
       this.logger.error(

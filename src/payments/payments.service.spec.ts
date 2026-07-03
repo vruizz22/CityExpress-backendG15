@@ -29,6 +29,7 @@ interface ShipmentRow {
   maxHops: number;
   deliveryStrategy: string;
   priorityClass: string;
+  insured: boolean;
   deliverNotBefore: Date | null;
   metaContent: string | null;
   routeMetricCost: bigint;
@@ -121,6 +122,7 @@ const baseShipment = (): ShipmentRow => ({
   maxHops: 5,
   deliveryStrategy: 'random',
   priorityClass: 'medium',
+  insured: false,
   deliverNotBefore: null,
   metaContent: null,
   routeMetricCost: BigInt(12000),
@@ -190,6 +192,29 @@ describe('PaymentsService.commitPayment', () => {
     expect(webpay.commit).toHaveBeenCalledTimes(1);
     expect(initialShipment.send).toHaveBeenCalledTimes(1);
     expect(audit.report).toHaveBeenCalledTimes(1);
+  });
+
+  // RF02 (E3) — un envío asegurado sale con insured en metaContent (enunciado).
+  it('gatilla envíos asegurados con metaContent { insured: true }', async () => {
+    const payments = [tryingPayment()];
+    const shipments = [
+      { ...baseShipment(), insured: true, metaContent: 'frágil' },
+    ];
+    webpay.commit.mockResolvedValue({
+      response_code: 0,
+      status: 'AUTHORIZED',
+      authorization_code: 'auth-123',
+      transaction_date: '2026-05-20T12:03:00Z',
+    });
+    const { service } = build(payments, shipments);
+
+    await service.commitPayment(user, { token_ws: 'tok-1' });
+
+    const [body] = initialShipment.send.mock.calls[0] as [
+      { metaContent: unknown; constraints: Record<string, unknown> },
+    ];
+    expect(body.metaContent).toEqual({ insured: true, note: 'frágil' });
+    expect(body.constraints).toMatchObject({ insured: true });
   });
 
   it('marca FAILED/REJECTED cuando Webpay rechaza y no gatilla envío', async () => {

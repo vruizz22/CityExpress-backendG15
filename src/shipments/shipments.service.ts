@@ -144,9 +144,10 @@ export class ShipmentsService {
     this.events.publish({
       type: 'package-created',
       packageId,
-      cityId: shipment.originId,
+      origin: shipment.originId,
+      destination: shipment.destinationId,
+      amount: shipment.amount,
       message: `Nuevo envío a ${shipment.destinationId}`,
-      data: { destinationId: shipment.destinationId, amount: shipment.amount },
     });
 
     return {

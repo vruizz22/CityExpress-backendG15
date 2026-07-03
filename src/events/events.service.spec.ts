@@ -7,7 +7,7 @@ describe('EventsService (RF04)', () => {
     const ev = service.publish({ type: 'package-created', packageId: 'pkg-1' });
 
     expect(ev.type).toBe('package-created');
-    expect(ev.at).toEqual(expect.any(String));
+    expect(ev.timestamp).toEqual(expect.any(String));
     expect(service.getRecent()).toHaveLength(1);
     expect(service.getRecent()[0].packageId).toBe('pkg-1');
   });
@@ -41,11 +41,34 @@ describe('EventsService (RF04)', () => {
     delete process.env.FEED_RECENT_MAX;
   });
 
+  it('preserva los campos flat del evento (origin/destination/amount, status/reason)', () => {
+    const service = new EventsService();
+    const ev = service.publish({
+      type: 'package-status',
+      packageId: 'pkg-5',
+      status: 'expired',
+      reason: 'inhabilitada',
+      origin: 'HGW',
+      destination: 'COR',
+      amount: 1500,
+    });
+
+    expect(ev).toMatchObject({
+      type: 'package-status',
+      packageId: 'pkg-5',
+      status: 'expired',
+      reason: 'inhabilitada',
+      origin: 'HGW',
+      destination: 'COR',
+      amount: 1500,
+    });
+  });
+
   it('getRecent devuelve una copia (no la referencia interna)', () => {
     const service = new EventsService();
     service.publish({ type: 'insurance-charged', packageId: 'pkg-9' });
     const snapshot = service.getRecent();
-    snapshot.push({ type: 'package-created', at: 'x' });
+    snapshot.push({ type: 'package-created', timestamp: 'x' });
     expect(service.getRecent()).toHaveLength(1);
   });
 });

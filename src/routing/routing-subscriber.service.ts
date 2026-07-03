@@ -13,8 +13,11 @@ import {
   DistanceTableMessageSchema,
   DistanceTableRequestSchema,
   MessageEnvelopeSchema,
+  PackageStatusMessageSchema,
 } from '@/messaging/message.schemas';
+import { AckMessage } from '@/messaging/message.types';
 import { DistanceTableService } from '@/routing/distance-table.service';
+import { InsuranceService } from '@/routing/insurance.service';
 import { PackageService } from '@/routing/package.service';
 
 /** Coacciona a string solo valores escalares; el resto a un placeholder. */
@@ -57,6 +60,7 @@ export class RoutingSubscriberService implements OnModuleInit {
     @Inject(MESSAGE_BROKER) private readonly broker: MessageBrokerService,
     private readonly packageService: PackageService,
     private readonly distanceTable: DistanceTableService,
+    private readonly insurance: InsuranceService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -137,10 +141,70 @@ export class RoutingSubscriberService implements OnModuleInit {
         return;
       }
 
+      // RF02 (E3) — somos la ciudad ORIGEN de un asegurado no entregable:
+      // ACK al emisor y cobro idempotente del seguro.
+      if (type === 'package-status') {
+        await this.handlePackageStatus(message, envelope.data);
+        return;
+      }
+
       if (type === 'package-transit') {
         await this.packageService.handlePackageTransit(message);
       }
     });
+  }
+
+  private async handlePackageStatus(
+    message: unknown,
+    envelope: { idpk?: string; msgId?: string; cityId?: string },
+  ): Promise<void> {
+    const parsed = PackageStatusMessageSchema.safeParse(message);
+    if (!parsed.success) {
+      this.logger.warn('package-status malformado.');
+      if (envelope.cityId) {
+        await this.sendAck(
+          envelope.cityId,
+          envelope.idpk ?? '',
+          envelope.msgId ?? '',
+          'nack',
+        );
+      }
+      return;
+    }
+
+    const sender = parsed.data.cityId;
+    if (sender && !sameCity(sender, CITY_ID)) {
+      await this.sendAck(sender, parsed.data.idpk, parsed.data.msgId, 'ack');
+    }
+
+    if (parsed.data.data.status !== 'expired') {
+      this.logger.debug(
+        `package-status "${parsed.data.data.status}" ignorado (solo expired cobra seguro).`,
+      );
+      return;
+    }
+
+    await this.insurance.chargeInsurance(
+      parsed.data.data.pkgId,
+      parsed.data.data.reason ?? 'expired',
+    );
+  }
+
+  /** ACK/NACK con el idpk/msgId ORIGINALES del mensaje (regla E1). */
+  private async sendAck(
+    destinationCityId: string,
+    idpk: string,
+    msgId: string,
+    type: 'ack' | 'nack',
+  ): Promise<void> {
+    const ack: AckMessage = {
+      idpk,
+      msgId,
+      type,
+      timestamp: new Date().toISOString(),
+      cityId: CITY_ID,
+    };
+    await this.broker.send(cityRoutingKey(destinationCityId), ack);
   }
 
   /** Dedup por msgId con TTL para descartar reentregas y romper loops. */

@@ -240,3 +240,137 @@ sequenceDiagram
 El monto cobrado queda **fijo** al pagar; recomputaciones posteriores de rutas
 solo afectan el siguiente salto, no el precio (E2). El estado `sent` se muestra
 en el front como *"Enviado al siguiente salto"* (`statusLabels.js`).
+
+## 10. E3 — Suscripciones, prioridad, seguros y feed en vivo (RDOC01)
+
+> Sección de la E3: motor de suscripciones (Step Functions), colas con
+> prioridad de RabbitMQ, seguros (`package-status` + cobro idempotente),
+> feed SSE en vivo y observabilidad. Cubre **RF01–RF04**, **RNF01** y
+> **RNF04** de la E3. El UML de componentes formal está en
+> `docs/arquitectura.drawio` (export `arquitectura.svg`).
+
+### 10.1 Vista de componentes E3 (delta sobre §3/§9)
+
+```mermaid
+flowchart TD
+    SPA[Browser SPA] -->|HTTPS| GW[AWS API Gateway]
+    GW -->|IEventFeed: GET /events/stream SSE| M
+
+    subgraph EC2["EC2 · Docker Compose"]
+        M[NestJS Master]
+        M --- EV[EventsController + EventsService<br/>feed en vivo RF04]
+        M --- INS[InsuranceService<br/>seguros RF02]
+        M --- RS[RoutingSubscriberService]
+    end
+
+    subgraph SFN["Motor de Suscripciones (RF01)"]
+        SM[Step Functions<br/>state machine] -->|DispatchTick<br/>waitForTaskToken| SQS[SQS tick + DLQ]
+        SQS -->|event source| LD[Lambda Dispatcher]
+    end
+
+    M -.->|StartExecution idempotente<br/>name=subscriptionId| SM
+    LD -->|ISubscriptionTick:<br/>POST /subscriptions/:id/tick| M
+
+    B[(Broker RabbitMQ<br/>city.* priority queues)]
+    RS <-->|package-transit priority 1–3<br/>package-status · ack/nack| B
+
+    NR[New Relic<br/>APM + alertas RNF01/RNF04]
+    M -.-> NR
+```
+
+### 10.2 RF03 — Prioridad de cola RabbitMQ
+
+Doble efecto del `priorityClass`, con una sola fuente de verdad en
+`src/payments/pricing.ts`:
+
+| `priorityClass` | Factor de precio (`PRIORITY_FACTORS`) | Prioridad AMQP (`PRIORITY_LEVELS`) |
+|---|---|---|
+| `low` | 0.5 | 1 |
+| `medium` (y desconocidos) | 1 | 2 |
+| `high` | 2.5 | 3 |
+
+Todo `package-transit` (envío inicial post-pago, forwarding y drenaje de
+`pending-route`) se publica con la propiedad AMQP `priority`
+(`SendOptions` en `MessageBrokerService.send`); el buffer offline la
+preserva al reconectar.
+
+**Supuesto documentado:** las colas `city.*` las declara el broker central;
+re-declararlas con `x-max-priority` desde el cliente daría
+`PRECONDITION_FAILED`. Cumplimos el lado productor exigido — el efecto de
+priorización opera en toda cola destino declarada como priority queue.
+
+### 10.3 RF02 — Seguros: `package-status` y cobro idempotente
+
+Mensaje nuevo (además de los de §9.2):
+
+| `type` | Dirección | Payload | Efecto |
+|---|---|---|---|
+| `package-status` | ciudad tenedora → ciudad **origen** | `data: { pkgId, status: 'expired', reason }` | el origen cobra el seguro del paquete asegurado |
+
+El flag viaja como `metaContent: { "insured": true }` (formato del
+enunciado; se aceptan además string JSON y `constraints.insured` por
+retro-compatibilidad — `src/routing/insurance.util.ts`).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Ciudad B (tenedora)
+    participant Broker
+    participant A as Ciudad A (origen, yo)
+    participant DB as Postgres
+    participant SSE as EventsService (feed)
+
+    Note over B: package-transit asegurado con maxHops = 0
+    B->>B: reportExpired + claim pkg-status:<pkgId>
+    B->>Broker: package-status {pkgId, expired, reason} → city.a
+    Broker->>A: package-status
+    A-->>Broker: ack (idpk/msgId originales) → city.b
+    A->>DB: claim insurance:<pkgId> (P2002 ⇒ duplicate ⇒ stop)
+    A->>DB: UserShipment / SubscriptionShipment ⇒ expired-insured
+    A->>SSE: insurance-charged (RF04, feed en vivo)
+```
+
+Idempotencia y anti-loops (refuerza §9.3): claims determinísticos
+`pkg-status:<pkgId>` (una notificación por paquete) e `insurance:<pkgId>`
+(un cobro por paquete) como PK de `PackageEvent`; si el origen somos
+nosotros se cobra directo **sin** pasar por el broker (no hay
+auto-mensajes); el dedup por `msgId` filtra reentregas; `package-status`
+malformado se NACKea — nunca un throw que re-encole infinito.
+
+**Tradeoff — alcance del "cobro":** registro idempotente + estado
+`expired-insured` + evento en vivo. No se muta `budgetSpent` ni se crea
+`BudgetLedgerEntry`: la contabilidad del motor de ticks es del dominio de
+suscripciones y mutarla desde el consumer AMQP podría descuadrarla. Si el
+grupo decide reembolso al budget, es un `ledger.create(...)` dentro de
+`chargeInsurance` (~5 líneas).
+
+### 10.4 RF04 — Feed en vivo (SSE)
+
+`EventsService` (Subject RxJS + buffer de recientes) expone
+`GET /events/stream` (SSE) y `GET /events/recent`. Emisores:
+
+| Evento | Emisor | Cuándo |
+|---|---|---|
+| `package-created` | shipments / suscripciones | envío inicial despachado |
+| `package-received` | `PackageService` | `package-transit` entrante (una vez por `idpk`) |
+| `package-redirected` | `PackageService` | forward al siguiente salto (incluye pendientes drenados) |
+| `insurance-charged` | `InsuranceService` | cobro del seguro ejecutado |
+
+SSE sobre HTTP/1.1 pasa por NGINX y API Gateway sin infraestructura
+adicional (tradeoff vs. WebSockets: unidireccional basta para un feed).
+
+### 10.5 RF01 — Motor de suscripciones (referencia)
+
+Detalle completo en `docs/step-functions.md` (owner: infra). Contrato:
+master gatilla `StartExecution` idempotente (`name = subscriptionId`);
+el loop `DispatchTick → SQS (waitForTaskToken) → Lambda → POST
+/subscriptions/:id/tick (x-tick-secret)` ejecuta `amount` envíos cada
+`periodSeconds`. Cada tick despachado entra al flujo de §9.5 y §10.2
+(mismo camino que un envío pagado).
+
+### 10.6 Observabilidad (RNF01/RNF04)
+
+New Relic APM + infra agent (ya en §3) se extiende con alertas de
+latencia/error-rate sobre el master y el motor de suscripciones
+(owner: observabilidad). Anotado en el UML como nota sobre
+`New Relic SaaS`.

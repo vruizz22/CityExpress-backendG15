@@ -1,0 +1,89 @@
+{
+  "Comment": "CityExpress E3 - Motor de suscripciones (RF01). Workflow Standard. processTick (backend de Andres) hace todo el gate+despacho+budget+idempotencia atomicamente y devuelve un status; la state machine solo lleva el contador de tick, espera la periodicidad y para segun el status. SQS + waitForTaskToken: el Dispatcher Lambda consume el tick, llama a processTick y devuelve el TickResult via SendTaskSuccess. El placeholder TickQueueUrl lo sustituye Terraform (templatefile).",
+  "StartAt": "Initialize",
+  "States": {
+    "Initialize": {
+      "Type": "Pass",
+      "Comment": "Input de StartExecution = { subscriptionId, periodSeconds, amount }. Se agrega tickNumber=0 (amount lo re-chequea el backend; la SM no lo usa).",
+      "Result": 0,
+      "ResultPath": "$.tickNumber",
+      "Next": "DispatchTick"
+    },
+
+    "DispatchTick": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+      "Comment": "Encola el tick (SQS) con el taskToken. El Dispatcher Lambda llama POST /internal/subscriptions/:id/tick y devuelve el TickResult con SendTaskSuccess.",
+      "Parameters": {
+        "QueueUrl": "${TickQueueUrl}",
+        "MessageBody": {
+          "subscriptionId.$": "$.subscriptionId",
+          "tickNumber.$": "$.tickNumber",
+          "taskToken.$": "$$.Task.Token"
+        }
+      },
+      "ResultPath": "$.tick",
+      "TimeoutSeconds": 60,
+      "Retry": [
+        {
+          "ErrorEquals": ["DispatchFailed", "States.Timeout", "States.TaskFailed"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "Failed"
+        }
+      ],
+      "Next": "EvaluateStatus"
+    },
+
+    "EvaluateStatus": {
+      "Type": "Choice",
+      "Comment": "Gate nativo: continua si status=triggered|duplicate; para si completed|skipped-no-budget (o cualquier status inesperado via Default).",
+      "Choices": [
+        {
+          "Or": [
+            { "Variable": "$.tick.status", "StringEquals": "triggered" },
+            { "Variable": "$.tick.status", "StringEquals": "duplicate" }
+          ],
+          "Next": "WaitPeriod"
+        }
+      ],
+      "Default": "Done"
+    },
+
+    "WaitPeriod": {
+      "Type": "Wait",
+      "Comment": "Periodicidad 1 min - 2 dias (60..172800 s). El Wait va DESPUES del envio: el 1er paquete sale al toque y los siguientes cada periodo.",
+      "SecondsPath": "$.periodSeconds",
+      "Next": "IncrementTick"
+    },
+
+    "IncrementTick": {
+      "Type": "Pass",
+      "Comment": "tickNumber++. Reconstruye el estado (subscriptionId, periodSeconds, tickNumber) y descarta el $.tick anterior.",
+      "Parameters": {
+        "subscriptionId.$": "$.subscriptionId",
+        "periodSeconds.$": "$.periodSeconds",
+        "tickNumber.$": "States.MathAdd($.tickNumber, 1)"
+      },
+      "Next": "DispatchTick"
+    },
+
+    "Done": {
+      "Type": "Succeed",
+      "Comment": "Termino normal: completed (amount alcanzado) o skipped-no-budget (budget agotado). $.tick.status indica cual."
+    },
+
+    "Failed": {
+      "Type": "Fail",
+      "Error": "SubscriptionEngineFailed",
+      "Cause": "Fallo irrecuperable tras reintentos (ver $.error). El dispatch no respondio o SQS fallo."
+    }
+  }
+}

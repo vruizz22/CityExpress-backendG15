@@ -6,6 +6,7 @@ import {
 } from '@/messaging/message-broker.interface';
 import { PackageTransitMessage } from '@/messaging/message.types';
 import { createBaseMessage } from '@/messaging/message.factory';
+import { getPriorityLevel } from '@/payments/pricing';
 import { DistanceTableService } from '@/routing/distance-table.service';
 import { PackageEventsRepository } from '@/routing/package-events.repository';
 import { PackageBody } from '@dto/package.dto';
@@ -64,7 +65,10 @@ export class AmqpInitialShipmentService implements InitialShipmentService {
       cityId: CITY_ID,
       packageBody,
     };
-    await this.broker.send(cityRoutingKey(nextHop), message);
+    // RF03 — creación de paquete con prioridad AMQP según priorityClass.
+    await this.broker.send(cityRoutingKey(nextHop), message, {
+      priority: getPriorityLevel(packageBody.priorityClass),
+    });
 
     this.logger.log(
       `Envío inicial: paquete ${packageBody.id} -> ${nextHop} (destino ${packageBody.destinationId}, criteria ${criteria}).`,
