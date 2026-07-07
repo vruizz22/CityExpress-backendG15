@@ -1,0 +1,319 @@
+# Instincts generated from https://github.com/vruizz22/CityExpress-backendG15
+# Generated: 2026-06-30T18:28:18.549Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: CityExpress-backendG15-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/vruizz22/CityExpress-backendG15
+---
+
+# CityExpress BackendG15 Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat
+
+## Evidence
+
+- 3 commits analyzed
+- Detected conventional commit pattern
+- Examples: feat(prisma): modelos de suscripciones y ledger de budget, feat(pricing): factor de prioridad y prima de seguro
+
+---
+id: CityExpress-backendG15-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/vruizz22/CityExpress-backendG15
+---
+
+# CityExpress BackendG15 Commit Length
+
+## Action
+
+Write moderate-length commit messages (~59 characters)
+
+## Evidence
+
+- Average commit message length: 59 chars
+- Based on 3 commits
+
+---
+id: CityExpress-backendG15-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/vruizz22/CityExpress-backendG15
+---
+
+# CityExpress BackendG15 Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: CityExpress-backendG15-import-alias
+trigger: "when importing modules"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/vruizz22/CityExpress-backendG15
+---
+
+# CityExpress BackendG15 Import Alias
+
+## Action
+
+Use path aliases (@/, ~/) instead of relative imports
+
+## Evidence
+
+- Import analysis shows alias pattern
+- Example: import { x } from '@/lib/x'
+
+---
+id: CityExpress-backendG15-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/vruizz22/CityExpress-backendG15
+---
+
+# CityExpress BackendG15 Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: CityExpress-backendG15-test-colocate
+trigger: "when writing tests"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/vruizz22/CityExpress-backendG15
+---
+
+# CityExpress BackendG15 Test Colocate
+
+## Action
+
+Place test file next to the source file (e.g., Button.test.tsx next to Button.tsx)
+
+## Evidence
+
+- Colocated test pattern detected
+- Tests live alongside source files
+
+---
+id: cityexpress-backendg15-instinct-filename-camelcase
+trigger: "When creating a new file in the codebase"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: vruizz22/CityExpress-backendG15
+---
+
+# Cityexpress Backendg15 Instinct Filename Camelcase
+
+## Action
+
+Name the file using camelCase format
+
+## Evidence
+
+- Pattern in namingConventions.files: camelCase
+
+---
+id: cityexpress-backendg15-instinct-function-camelcase
+trigger: "When defining a new function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: vruizz22/CityExpress-backendG15
+---
+
+# Cityexpress Backendg15 Instinct Function Camelcase
+
+## Action
+
+Name the function using camelCase format
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: cityexpress-backendg15-instinct-class-pascalcase
+trigger: "When defining a new class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: vruizz22/CityExpress-backendG15
+---
+
+# Cityexpress Backendg15 Instinct Class Pascalcase
+
+## Action
+
+Name the class using PascalCase format
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+
+---
+id: cityexpress-backendg15-instinct-constant-screaming-snake-case
+trigger: "When declaring a constant"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: vruizz22/CityExpress-backendG15
+---
+
+# Cityexpress Backendg15 Instinct Constant Screaming Snake Case
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE format
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: cityexpress-backendg15-instinct-import-alias
+trigger: "When importing modules"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: vruizz22/CityExpress-backendG15
+---
+
+# Cityexpress Backendg15 Instinct Import Alias
+
+## Action
+
+Use alias import style
+
+## Evidence
+
+- Pattern in importStyle: alias
+
+---
+id: cityexpress-backendg15-instinct-export-named
+trigger: "When exporting modules or functions"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: vruizz22/CityExpress-backendG15
+---
+
+# Cityexpress Backendg15 Instinct Export Named
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in exportStyle: named
+
+---
+id: cityexpress-backendg15-instinct-try-catch-errors
+trigger: "When handling errors in code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: vruizz22/CityExpress-backendG15
+---
+
+# Cityexpress Backendg15 Instinct Try Catch Errors
+
+## Action
+
+Use try-catch blocks for error handling
+
+## Evidence
+
+- Pattern in errorHandling.style: try-catch
+
+---
+id: cityexpress-backendg15-instinct-test-colocated
+trigger: "When adding tests for a module or feature"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: vruizz22/CityExpress-backendG15
+---
+
+# Cityexpress Backendg15 Instinct Test Colocated
+
+## Action
+
+Place test files in the same folder as the code they test (colocated)
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation: colocated
+
+---
+id: cityexpress-backendg15-instinct-git-conventional-commits
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: vruizz22/CityExpress-backendG15
+---
+
+# Cityexpress Backendg15 Instinct Git Conventional Commits
+
+## Action
+
+Use the conventional commit format with a prefix (e.g., feat), scope, and description
+
+## Evidence
+
+- Pattern in commits.type: conventional
+- Examples: 'feat(prisma): modelos de suscripciones y ledger de budget'
+
+---
+id: cityexpress-backendg15-instinct-git-commit-prefix-feat
+trigger: "When committing a new feature"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: vruizz22/CityExpress-backendG15
+---
+
+# Cityexpress Backendg15 Instinct Git Commit Prefix Feat
+
+## Action
+
+Prefix the commit message with 'feat'
+
+## Evidence
+
+- Pattern in commits.prefixes: feat
+- Examples: 'feat(pricing): factor de prioridad y prima de seguro'
+
